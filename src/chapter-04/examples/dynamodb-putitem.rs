@@ -19,6 +19,7 @@ async fn main() {
             ),
         )
         .item("Clicks", AttributeValue::N("0".to_string()))
+        .condition_expression("attribute_not_exists(LinkId)")
         .send()
         .await;
 
