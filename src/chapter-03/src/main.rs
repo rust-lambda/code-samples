@@ -61,7 +61,7 @@ async fn function_handler(
                 }
             }
         },
-        _ => generate_api_response(405, "".to_string()),
+        _ => generate_api_response(405, "Method not allowed".to_string()),
     }
 }
 

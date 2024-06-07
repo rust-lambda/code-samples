@@ -1,3 +1,4 @@
+use cuid2::CuidConstructor;
 use lazy_static::lazy_static;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
@@ -44,14 +45,12 @@ impl UrlShortener {
 
     pub fn retrieve_url(&self, short_url: String) -> Option<String> {
         let map = SHORTENED_URLS.lock().unwrap();
-        match map.get(&short_url) {
-            None => None,
-            Some(url) => Some(url.clone()),
-        }
+        
+        map.get(&short_url).cloned()
     }
 
     fn generate_short_url(&self) -> String {
-        let mut rng = thread_rng();
-        (0..8).map(|_| rng.sample(Alphanumeric) as char).collect()
+        let idgen = CuidConstructor::new().with_length(10);
+        idgen.create_id()
     }
 }
