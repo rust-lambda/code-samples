@@ -1,0 +1,11 @@
+[package]
+name = "serverless-link-shortener-chapter-04"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+aws-config = { version = "1.1.7", features = ["behavior-version-latest"] }
+aws-sdk-dynamodb = "1.31.1"
+
+[dev-dependencies]
