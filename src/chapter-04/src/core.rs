@@ -47,16 +47,16 @@ impl UrlShortener {
             Ok(_) => Ok(ShortenUrlResponse {
                 shortened_url: short_url,
             }),
-            Err(e) => return Err(format!("Failed to shorten URL: {:?}", e)),
+            Err(e) => Err(format!("Failed to shorten URL: {:?}", e)),
         }
     }
 
-    pub async fn retrieve_url(&self, short_url: String) -> Result<Option<String>, String> {
+    pub async fn retrieve_url(&self, short_url: &str) -> Result<Option<String>, String> {
         let result = self
             .dynamodb_client
             .get_item()
             .table_name(&self.dynamodb_urls_table)
-            .key("LinkId", AttributeValue::S(short_url.clone()))
+            .key("LinkId", AttributeValue::S(short_url.to_string()))
             .send()
             .await;
 
