@@ -20,7 +20,7 @@ async fn function_handler(
             let shorten_url_request_body = event.payload::<ShortenUrlRequest>()?;
 
             match shorten_url_request_body {
-                None => generate_api_response(400, "".to_string()),
+                None => generate_api_response(400, "Bad request".to_string()),
                 Some(shorten_url_request) => {
                     let shortened_url_response =
                         url_shortener.shorten_url(shorten_url_request).await;
@@ -29,8 +29,10 @@ async fn function_handler(
                         Ok(response) => {
                             generate_api_response(200, serde_json::to_string(&response).unwrap())?
                         }
-                        // TODO: handle error better (this should be a 500)
-                        Err(_) => generate_api_response(400, "Bad request".to_string())?,
+                        Err(e) => {
+                            tracing::error!("Failed to shorten URL: {:?}", e);
+                            generate_api_response(500, "Internal Server Error".to_string())?
+                        }
                     };
 
                     Ok(response)
