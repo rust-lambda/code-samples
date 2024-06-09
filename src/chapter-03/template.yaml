@@ -18,12 +18,12 @@ Resources:
       Architectures:
         - arm64
       Events:
-        Api:
+        CreateShortUrl:
           Type: HttpApi
           Properties:
             Path: /
             Method: POST
-        GetEndpoint:
+        VisitShortUrl:
           Type: HttpApi
           Properties:
             Path: /{shortUrl}
