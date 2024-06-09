@@ -1,10 +1,9 @@
+use crate::core::{ShortenUrlRequest, UrlShortener};
+use crate::utils::generate_api_response;
 use lambda_http::http::StatusCode;
 use lambda_http::{
     run, service_fn, tracing, Error, IntoResponse, Request, RequestExt, RequestPayloadExt, Response,
 };
-
-use crate::core::{ShortenUrlRequest, UrlShortener};
-use crate::utils::generate_api_response;
 
 mod core;
 mod utils;
@@ -20,11 +19,7 @@ async fn function_handler(
             let shorten_url_request_body = event.payload::<ShortenUrlRequest>()?;
 
             match shorten_url_request_body {
-                None => {
-                    let resp = generate_api_response(400, "".to_string());
-
-                    resp
-                }
+                None => generate_api_response(400, "".to_string()),
                 Some(shorten_url_request) => {
                     let shortened_url_response = url_shortener.shorten_url(shorten_url_request);
 
@@ -38,7 +33,7 @@ async fn function_handler(
                     Ok(response)
                 }
             }
-        },
+        }
         "GET" => {
             let short_url = event
                 .path_parameters_ref()
@@ -60,7 +55,7 @@ async fn function_handler(
                     Ok(response)
                 }
             }
-        },
+        }
         _ => generate_api_response(405, "Method not allowed".to_string()),
     }
 }

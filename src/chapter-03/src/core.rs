@@ -1,19 +1,7 @@
 use cuid2::CuidConstructor;
-use lazy_static::lazy_static;
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Mutex;
-
-// This is for DEMONSTRATION purposes only
-// Static variables are normally a bad practice in Lambda, as separate execution environments will not share values
-lazy_static! {
-    static ref SHORTENED_URLS: Mutex<HashMap<String, String>> = {
-        let mut m = HashMap::new();
-        Mutex::new(m)
-    };
-}
+use std::sync::RwLock;
 
 #[derive(Deserialize)]
 pub struct ShortenUrlRequest {
@@ -25,17 +13,20 @@ pub struct ShortenUrlResponse {
     shortened_url: String,
 }
 
-pub struct UrlShortener {}
+#[derive(Default, Debug)]
+pub struct UrlShortener {
+    urls: RwLock<HashMap<String, String>>,
+}
 
 impl UrlShortener {
     pub fn new() -> Self {
-        Self {}
+        Self::default()
     }
 
     pub fn shorten_url(&self, req: ShortenUrlRequest) -> Result<ShortenUrlResponse, ()> {
         let short_url = self.generate_short_url();
 
-        let mut map = SHORTENED_URLS.lock().unwrap();
+        let mut map = self.urls.write().unwrap();
         map.insert(short_url.clone(), req.url_to_shorten);
 
         Ok(ShortenUrlResponse {
@@ -44,8 +35,7 @@ impl UrlShortener {
     }
 
     pub fn retrieve_url(&self, short_url: String) -> Option<String> {
-        let map = SHORTENED_URLS.lock().unwrap();
-        
+        let map = self.urls.read().unwrap();
         map.get(&short_url).cloned()
     }
 
