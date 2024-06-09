@@ -26,10 +26,10 @@ Resources:
         VisitShortUrl:
           Type: HttpApi
           Properties:
-            Path: /{shortUrl}
+            Path: /{linkId}
             Method: GET
 
 Outputs:
   UrlShortenerEndpoint:
     Description: "API endpoint"
-    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/ "
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/"

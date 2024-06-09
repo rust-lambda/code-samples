@@ -19,15 +19,15 @@ async fn function_handler(
             let shorten_url_request_body = event.payload::<ShortenUrlRequest>()?;
 
             match shorten_url_request_body {
-                None => generate_api_response(400, "".to_string()),
+                None => generate_api_response(400, "Bad Request"),
                 Some(shorten_url_request) => {
                     let shortened_url_response = url_shortener.shorten_url(shorten_url_request);
 
                     let response = match shortened_url_response {
                         Ok(response) => {
-                            generate_api_response(200, serde_json::to_string(&response).unwrap())?
+                            generate_api_response(200, &serde_json::to_string(&response).unwrap())?
                         }
-                        Err(_) => generate_api_response(400, "Bad request".to_string())?,
+                        Err(_) => generate_api_response(400, "Bad Request")?,
                     };
 
                     Ok(response)
@@ -35,15 +35,19 @@ async fn function_handler(
             }
         }
         "GET" => {
-            let short_url = event
+            let link_id = event
                 .path_parameters_ref()
-                .and_then(|params| params.first("shortUrl"))
+                .and_then(|params| params.first("linkId"))
                 .unwrap_or("");
 
-            let full_url = url_shortener.retrieve_url(short_url.to_string());
+            if link_id.is_empty() {
+                return generate_api_response(404, "Not Found");
+            }
+
+            let full_url = url_shortener.retrieve_url(link_id);
 
             match full_url {
-                None => Ok(generate_api_response(404, "".to_string())?),
+                None => Ok(generate_api_response(404, "Not Found")?),
                 Some(url) => {
                     let response = Response::builder()
                         .status(StatusCode::from_u16(302).unwrap())
@@ -55,7 +59,7 @@ async fn function_handler(
                 }
             }
         }
-        _ => generate_api_response(405, "Method not allowed".to_string()),
+        _ => generate_api_response(405, "Method Not Allowed"),
     }
 }
 

@@ -34,9 +34,9 @@ impl UrlShortener {
         })
     }
 
-    pub fn retrieve_url(&self, short_url: String) -> Option<String> {
+    pub fn retrieve_url(&self, short_url: &str) -> Option<String> {
         let map = self.urls.read().unwrap();
-        map.get(&short_url).cloned()
+        map.get(short_url).cloned()
     }
 
     fn generate_short_url(&self) -> String {
