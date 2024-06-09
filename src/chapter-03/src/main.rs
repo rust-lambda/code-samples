@@ -27,7 +27,7 @@ async fn function_handler(
                         Ok(response) => {
                             generate_api_response(200, serde_json::to_string(&response).unwrap())?
                         }
-                        Err(_) => generate_api_response(400, "".to_string())?,
+                        Err(_) => generate_api_response(400, "Bad request".to_string())?,
                     };
 
                     Ok(response)
@@ -47,7 +47,6 @@ async fn function_handler(
                 Some(url) => {
                     let response = Response::builder()
                         .status(StatusCode::from_u16(302).unwrap())
-                        .header("content-type", "application/json")
                         .header("Location", url)
                         .body("".to_string())
                         .map_err(Box::new)?;
