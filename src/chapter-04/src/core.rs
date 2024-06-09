@@ -19,9 +19,9 @@ pub struct UrlShortener {
 }
 
 impl UrlShortener {
-    pub fn new(dynamodb_urls_table: String, dynamodb_client: Client) -> Self {
+    pub fn new(dynamodb_urls_table: &str, dynamodb_client: Client) -> Self {
         Self {
-            dynamodb_urls_table,
+            dynamodb_urls_table: dynamodb_urls_table.to_string(),
             dynamodb_client,
         }
     }
