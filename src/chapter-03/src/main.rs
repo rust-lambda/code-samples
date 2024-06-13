@@ -22,15 +22,10 @@ async fn function_handler(
                 None => generate_api_response(400, "Bad Request"),
                 Some(shorten_url_request) => {
                     let shortened_url_response = url_shortener.shorten_url(shorten_url_request);
-
-                    let response = match shortened_url_response {
-                        Ok(response) => {
-                            generate_api_response(200, &serde_json::to_string(&response).unwrap())?
-                        }
-                        Err(_) => generate_api_response(400, "Bad Request")?,
-                    };
-
-                    Ok(response)
+                    Ok(generate_api_response(
+                        200,
+                        &serde_json::to_string(&shortened_url_response).unwrap(),
+                    )?)
                 }
             }
         }

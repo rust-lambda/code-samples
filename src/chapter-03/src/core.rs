@@ -23,15 +23,15 @@ impl UrlShortener {
         Self::default()
     }
 
-    pub fn shorten_url(&self, req: ShortenUrlRequest) -> Result<ShortenUrlResponse, ()> {
+    pub fn shorten_url(&self, req: ShortenUrlRequest) -> ShortenUrlResponse {
         let short_url = self.generate_short_url();
 
         let mut map = self.urls.write().unwrap();
         map.insert(short_url.clone(), req.url_to_shorten);
 
-        Ok(ShortenUrlResponse {
+        ShortenUrlResponse {
             shortened_url: short_url,
-        })
+        }
     }
 
     pub fn retrieve_url(&self, short_url: &str) -> Option<String> {
