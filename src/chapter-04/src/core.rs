@@ -29,8 +29,7 @@ impl UrlShortener {
     pub async fn shorten_url(&self, req: ShortenUrlRequest) -> Result<ShortenUrlResponse, String> {
         let short_url = self.generate_short_url();
 
-        let result = self
-            .dynamodb_client
+        self.dynamodb_client
             .put_item()
             .table_name(&self.dynamodb_urls_table)
             .item("LinkId", AttributeValue::S(short_url.clone()))
@@ -41,32 +40,26 @@ impl UrlShortener {
             .item("Clicks", AttributeValue::N("0".to_string()))
             .condition_expression("attribute_not_exists(LinkId)")
             .send()
-            .await;
-
-        match result {
-            Ok(_) => Ok(ShortenUrlResponse {
+            .await
+            .map(|_| ShortenUrlResponse {
                 shortened_url: short_url,
-            }),
-            Err(e) => Err(format!("Failed to shorten URL: {:?}", e)),
-        }
+            })
+            .map_err(|e| format!("Error adding item: {:?}", e))
     }
 
     pub async fn retrieve_url(&self, short_url: &str) -> Result<Option<String>, String> {
-        let result = self
-            .dynamodb_client
+        self.dynamodb_client
             .get_item()
             .table_name(&self.dynamodb_urls_table)
             .key("LinkId", AttributeValue::S(short_url.to_string()))
             .send()
-            .await;
-
-        result
+            .await
             .map_err(|e| format!("Error getting item: {:?}", e))
             .map(|record| {
                 record.item.and_then(|attributes| {
                     attributes
                         .get("OriginalLink")
-                        .map(|v| v.as_s().unwrap().clone())
+                        .and_then(|v| v.as_s().cloned().ok())
                 })
             })
     }
