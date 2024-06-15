@@ -58,6 +58,9 @@ async fn function_handler(
                 }
                 Ok(None) => Ok(generate_api_response(404, "Not Found")?),
                 Ok(Some(url)) => {
+                    if let Err(e) = url_shortener.increment_clicks(link_id).await {
+                        tracing::error!("Failed to increment clicks: {:?}", e);
+                    }
                     let response = Response::builder()
                         .status(StatusCode::from_u16(302).unwrap())
                         .header("Location", url)
