@@ -1,5 +1,6 @@
 use crate::core::{ShortenUrlRequest, UrlShortener};
 use crate::utils::generate_api_response;
+use aws_sdk_dynamodb::operation::query;
 use lambda_http::http::StatusCode;
 use lambda_http::{
     run, service_fn, tracing, Error, IntoResponse, Request, RequestExt, RequestPayloadExt, Response,
@@ -13,10 +14,9 @@ async fn function_handler(
     url_shortener: &UrlShortener,
     event: Request,
 ) -> Result<impl IntoResponse, Error> {
-    // Manually writing a router in Lambda is not a best practice, in practice you would either use seperate Lambda functions per endpoint or use a web framework like Actix or Axum inside Lambda.
-    // This is purely for demonstration purposes to allow us to build a functioning URL shortener and share memory between GET and POST requests.
-    match event.method().as_str() {
-        "POST" => {
+    tracing::info!("Received event: {:?}", event);
+    match (event.method().as_str(), event.raw_http_path()) {
+        ("POST", "/links") => {
             let shorten_url_request_body = event.payload::<ShortenUrlRequest>()?;
 
             match shorten_url_request_body {
@@ -39,7 +39,27 @@ async fn function_handler(
                 }
             }
         }
-        "GET" => {
+        ("GET", "/links") => {
+            let query_params = event.query_string_parameters();
+            let last_evaluated_id = query_params.first("last_evaluated_id");
+
+            let links = url_shortener.list_urls(last_evaluated_id).await;
+            match links {
+                Ok(links) => {
+                    let response = Response::builder()
+                        .status(StatusCode::OK)
+                        .header("content-type", "application/json")
+                        .body(serde_json::to_string(&links)?)
+                        .map_err(Box::new)?;
+                    Ok(response)
+                }
+                Err(e) => {
+                    tracing::error!("Failed to list URLs: {:?}", e);
+                    Ok(generate_api_response(500, "Internal Server Error")?)
+                }
+            }
+        }
+        ("GET", _) => {
             let link_id = event
                 .path_parameters_ref()
                 .and_then(|params| params.first("linkId"))

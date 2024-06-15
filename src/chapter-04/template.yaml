@@ -20,7 +20,7 @@ Resources:
         CreateShortUrl:
           Type: HttpApi
           Properties:
-            Path: /
+            Path: /links
             Method: POST
         VisitShortUrl:
           Type: HttpApi
