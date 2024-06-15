@@ -228,6 +228,19 @@ impl UrlShortener {
         })
     }
 
+    pub async fn increment_clicks(&self, link_id: &str) -> Result<(), String> {
+        self.dynamodb_client
+            .update_item()
+            .table_name(&self.dynamodb_urls_table)
+            .key("LinkId", AttributeValue::S(link_id.to_string()))
+            .update_expression("SET Clicks = Clicks + :val")
+            .expression_attribute_values(":val", AttributeValue::N("1".to_string()))
+            .send()
+            .await
+            .map(|_| ())
+            .map_err(|e| format!("Error incrementing clicks: {:?}", e))
+    }
+
     fn generate_short_url(&self) -> String {
         let idgen = CuidConstructor::new().with_length(10);
         idgen.create_id()
