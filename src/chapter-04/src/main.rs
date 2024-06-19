@@ -1,6 +1,5 @@
 use crate::core::{ShortenUrlRequest, UrlShortener};
 use crate::utils::generate_api_response;
-use aws_sdk_dynamodb::operation::query;
 use lambda_http::http::StatusCode;
 use lambda_http::{
     run, service_fn, tracing, Error, IntoResponse, Request, RequestExt, RequestPayloadExt, Response,

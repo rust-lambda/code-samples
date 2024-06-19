@@ -86,6 +86,9 @@ pub struct ShortUrl {
     link_id: String,
     original_link: String,
     clicks: u32,
+    title: Option<String>,
+    description: Option<String>,
+    content_type: Option<String>,
 }
 
 impl TryFrom<HashMap<String, AttributeValue>> for ShortUrl {
@@ -113,11 +116,23 @@ impl TryFrom<HashMap<String, AttributeValue>> for ShortUrl {
                 n.parse::<u32>()
                     .map_err(|_| "Cannot convert Clicks into u32".to_string())
             })?;
+        let content_type = item
+            .get("ContentType")
+            .and_then(|c| c.as_s().map(|s| s.to_string()).ok());
+        let title = item
+            .get("Title")
+            .and_then(|c| c.as_s().map(|s| s.to_string()).ok());
+        let description = item
+            .get("Description")
+            .and_then(|c| c.as_s().map(|s| s.to_string()).ok());
 
         Ok(Self {
             link_id,
             original_link,
             clicks,
+            content_type,
+            title,
+            description,
         })
     }
 }
