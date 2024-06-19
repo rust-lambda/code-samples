@@ -1,13 +1,14 @@
 use crate::core::{ShortenUrlRequest, UrlShortener};
 use crate::utils::generate_api_response;
-use aws_sdk_dynamodb::operation::query;
 use lambda_http::http::StatusCode;
 use lambda_http::{
     run, service_fn, tracing, Error, IntoResponse, Request, RequestExt, RequestPayloadExt, Response,
 };
 use std::env;
+use url_info::UrlInfo;
 
 mod core;
+pub mod url_info;
 mod utils;
 
 async fn function_handler(
@@ -101,7 +102,9 @@ async fn main() -> Result<(), Error> {
     let table_name = env::var("TABLE_NAME").expect("TABLE_NAME is not set");
     let config = aws_config::load_from_env().await;
     let dynamodb_client = aws_sdk_dynamodb::Client::new(&config);
-    let shortener = UrlShortener::new(&table_name, dynamodb_client);
+    let http_client = reqwest::Client::new();
+    let url_info = UrlInfo::new(http_client);
+    let shortener = UrlShortener::new(&table_name, dynamodb_client, url_info);
 
     run(service_fn(|event| function_handler(&shortener, event))).await
 }

@@ -1,23 +1,19 @@
-use std::collections::HashMap;
-
+use crate::url_info::UrlInfo;
 use aws_sdk_dynamodb::{types::AttributeValue, Client};
 use cuid2::CuidConstructor;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Deserialize)]
 pub struct ShortenUrlRequest {
     url_to_shorten: String,
 }
 
-#[derive(Serialize)]
-pub struct ShortenUrlResponse {
-    shortened_url: String,
-}
-
 #[derive(Debug)]
 pub struct UrlShortener {
     dynamodb_urls_table: String,
     dynamodb_client: Client,
+    url_info: UrlInfo,
 }
 
 #[derive(Debug, Serialize)]
@@ -25,6 +21,9 @@ pub struct ShortUrl {
     link_id: String,
     original_link: String,
     clicks: u32,
+    title: Option<String>,
+    description: Option<String>,
+    content_type: Option<String>,
 }
 
 impl TryFrom<HashMap<String, AttributeValue>> for ShortUrl {
@@ -52,11 +51,23 @@ impl TryFrom<HashMap<String, AttributeValue>> for ShortUrl {
                 n.parse::<u32>()
                     .map_err(|_| "Cannot convert Clicks into u32".to_string())
             })?;
+        let content_type = item
+            .get("ContentType")
+            .and_then(|c| c.as_s().map(|s| s.to_string()).ok());
+        let title = item
+            .get("Title")
+            .and_then(|c| c.as_s().map(|s| s.to_string()).ok());
+        let description = item
+            .get("Description")
+            .and_then(|c| c.as_s().map(|s| s.to_string()).ok());
 
         Ok(Self {
             link_id,
             original_link,
             clicks,
+            content_type,
+            title,
+            description,
         })
     }
 }
@@ -68,17 +79,24 @@ pub struct ListShortUrlsResponse {
 }
 
 impl UrlShortener {
-    pub fn new(dynamodb_urls_table: &str, dynamodb_client: Client) -> Self {
+    pub fn new(dynamodb_urls_table: &str, dynamodb_client: Client, url_info: UrlInfo) -> Self {
         Self {
             dynamodb_urls_table: dynamodb_urls_table.to_string(),
             dynamodb_client,
+            url_info,
         }
     }
 
-    pub async fn shorten_url(&self, req: ShortenUrlRequest) -> Result<ShortenUrlResponse, String> {
+    pub async fn shorten_url(&self, req: ShortenUrlRequest) -> Result<ShortUrl, String> {
         let short_url = self.generate_short_url();
+        let url_details = self
+            .url_info
+            .fetch_details(&req.url_to_shorten)
+            .await
+            .unwrap_or_default();
 
-        self.dynamodb_client
+        let mut put_item = self
+            .dynamodb_client
             .put_item()
             .table_name(&self.dynamodb_urls_table)
             .item("LinkId", AttributeValue::S(short_url.clone()))
@@ -86,12 +104,29 @@ impl UrlShortener {
                 "OriginalLink",
                 AttributeValue::S(req.url_to_shorten.clone()),
             )
-            .item("Clicks", AttributeValue::N("0".to_string()))
+            .item("Clicks", AttributeValue::N("0".to_string()));
+
+        if let Some(ref title) = url_details.title {
+            put_item = put_item.item("Title", AttributeValue::S(title.to_string()));
+        }
+        if let Some(ref description) = url_details.description {
+            put_item = put_item.item("Description", AttributeValue::S(description.to_string()));
+        }
+        if let Some(ref content_type) = url_details.content_type {
+            put_item = put_item.item("ContentType", AttributeValue::S(content_type.to_string()));
+        }
+
+        put_item
             .condition_expression("attribute_not_exists(LinkId)")
             .send()
             .await
-            .map(|_| ShortenUrlResponse {
-                shortened_url: short_url,
+            .map(|_| ShortUrl {
+                link_id: short_url,
+                original_link: req.url_to_shorten.clone(),
+                clicks: 0,
+                title: url_details.title,
+                description: url_details.description,
+                content_type: url_details.content_type,
             })
             .map_err(|e| format!("Error adding item: {:?}", e))
     }
