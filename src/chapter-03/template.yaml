@@ -18,18 +18,18 @@ Resources:
       Architectures:
         - arm64
       Events:
-        Api:
+        CreateShortUrl:
           Type: HttpApi
           Properties:
             Path: /
             Method: POST
-        GetEndpoint:
+        VisitShortUrl:
           Type: HttpApi
           Properties:
-            Path: /{shortUrl}
+            Path: /{linkId}
             Method: GET
 
 Outputs:
   UrlShortenerEndpoint:
     Description: "API endpoint"
-    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/ "
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/"
