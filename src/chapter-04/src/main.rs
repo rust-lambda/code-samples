@@ -102,7 +102,9 @@ async fn main() -> Result<(), Error> {
     let table_name = env::var("TABLE_NAME").expect("TABLE_NAME is not set");
     let config = aws_config::load_from_env().await;
     let dynamodb_client = aws_sdk_dynamodb::Client::new(&config);
-    let http_client = reqwest::Client::new();
+    let http_client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(2))
+        .build()?;
     let url_info = UrlInfo::new(http_client);
     let shortener = UrlShortener::new(&table_name, dynamodb_client, url_info);
 
