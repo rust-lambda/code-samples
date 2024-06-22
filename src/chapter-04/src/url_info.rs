@@ -34,32 +34,31 @@ impl UrlInfo {
 
         let mut title = None;
         let mut description = None;
-        if matches!(content_type, Some(ref t) if t.starts_with("text/html")) {
-            // ...
-            let html_body = response
-                .text()
-                .await
-                .map_err(|e| format!("Cannot read response body: {}", e))?;
-
-            let document = Html::parse_document(&html_body);
-            if let Some(title_element) = document.select(&Selector::parse("title").unwrap()).next()
-            {
-                title = Some(
-                    title_element
-                        .inner_html()
-                        .chars()
-                        .take(256)
-                        .collect::<String>(),
-                );
-            }
-            if let Some(description_element) = document
-                .select(&Selector::parse("meta[name=description]").unwrap())
-                .next()
-            {
-                description = description_element
-                    .value()
-                    .attr("content")
-                    .map(|s| s.chars().take(256).collect::<String>());
+        if matches!(content_type, Some(ref ct) if ct.starts_with("text/html")) {
+            if let Ok(html_body) = response.text().await {
+                let document = Html::parse_document(&html_body);
+                if let Some(title_element) = document
+                    .select(&Selector::parse("head > title").unwrap())
+                    .next()
+                {
+                    title = Some(
+                        title_element
+                            .inner_html()
+                            .trim()
+                            .chars()
+                            .take(256)
+                            .collect::<String>(),
+                    );
+                }
+                if let Some(description_element) = document
+                    .select(&Selector::parse("head > meta[name=description]").unwrap())
+                    .next()
+                {
+                    description = description_element
+                        .value()
+                        .attr("content")
+                        .map(|s| s.chars().take(256).collect::<String>());
+                }
             }
         }
 

@@ -8,7 +8,7 @@ use std::env;
 use url_info::UrlInfo;
 
 mod core;
-pub mod url_info;
+mod url_info;
 mod utils;
 
 async fn function_handler(
