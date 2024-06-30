@@ -1,8 +1,12 @@
 use crate::url_info::UrlInfo;
-use aws_sdk_dynamodb::{types::AttributeValue, Client};
+use aws_sdk_dynamodb::{
+    error::SdkError,
+    types::{error::ConditionalCheckFailedException, AttributeValue, ReturnValue},
+    Client,
+};
 use cuid2::CuidConstructor;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, error::Error};
 
 #[derive(Deserialize)]
 pub struct ShortenUrlRequest {
@@ -148,17 +152,42 @@ impl UrlShortener {
             })
     }
 
-    pub async fn increment_clicks(&self, link_id: &str) -> Result<(), String> {
-        self.dynamodb_client
+    pub async fn retrieve_url_and_increment_clicks(
+        &self,
+        link_id: &str,
+    ) -> Result<Option<String>, String> {
+        let result = self
+            .dynamodb_client
             .update_item()
             .table_name(&self.dynamodb_urls_table)
             .key("LinkId", AttributeValue::S(link_id.to_string()))
             .update_expression("SET Clicks = Clicks + :val")
             .expression_attribute_values(":val", AttributeValue::N("1".to_string()))
+            .condition_expression("attribute_exists(LinkId)")
+            .return_values(ReturnValue::AllNew)
             .send()
             .await
-            .map(|_| ())
-            .map_err(|e| format!("Error incrementing clicks: {:?}", e))
+            .map(|record| {
+                record.attributes.and_then(|attributes| {
+                    attributes
+                        .get("OriginalLink")
+                        .and_then(|v| v.as_s().cloned().ok())
+                })
+            });
+
+        match result {
+            Err(e) => {
+                let generic_err_msg = format!("Error incrementing clicks: {:?}", e);
+                if e.into_service_error()
+                    .is_conditional_check_failed_exception()
+                {
+                    Ok(None)
+                } else {
+                    Err(generic_err_msg)
+                }
+            }
+            Ok(result) => Ok(result),
+        }
     }
 
     pub async fn list_urls(
