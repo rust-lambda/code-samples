@@ -1,5 +1,5 @@
 [package]
-name = "serverless_link_shortener"
+name = "serverless-link-shortener-chapter-02"
 version = "0.1.0"
 edition = "2021"
 
