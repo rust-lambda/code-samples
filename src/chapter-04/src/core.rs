@@ -5,7 +5,7 @@ use aws_sdk_dynamodb::{
 };
 use cuid2::CuidConstructor;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, error::Error};
+use std::collections::HashMap;
 
 #[derive(Deserialize)]
 pub struct ShortenUrlRequest {
