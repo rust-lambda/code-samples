@@ -1,0 +1,10 @@
+[workspace]
+resolver = "2"
+members = [
+  "src/chapter-01",
+  "src/chapter-02",
+  "src/chapter-02-challenge",
+  "src/chapter-03",
+  "src/chapter-04",
+  "src/chapter-04-challenge",
+]
