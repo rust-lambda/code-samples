@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Globals:
+  Function:
+    Timeout: 3
+
+Resources:
+  ShortenUrlFunction:
+    Metadata:
+      BuildMethod: rust-cargolambda
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      Events:
+        CreateShortUrl:
+          Type: HttpApi
+          Properties:
+            Path: /links
+            Method: POST
+        VisitShortUrl:
+          Type: HttpApi
+          Properties:
+            Path: /{linkId}
+            Method: GET
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref LinksTable
+      Policies: 
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LinksTable
+  LinksTable:
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Type: AWS::DynamoDB::Table
+    Properties:
+      KeySchema:
+        - AttributeName: LinkId
+          KeyType: HASH
+      AttributeDefinitions:
+        - AttributeName: LinkId
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+
+Outputs:
+  LinksTableName:
+    Description: "LinksTable name"
+    Value: !Ref LinksTable
+  UrlShortenerEndpoint:
+    Description: "API endpoint"
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/"

@@ -27,6 +27,7 @@ pub struct ShortUrl {
     title: Option<String>,
     description: Option<String>,
     content_type: Option<String>,
+    preview_image_url: Option<String>,
 }
 
 impl TryFrom<HashMap<String, AttributeValue>> for ShortUrl {
@@ -63,6 +64,9 @@ impl TryFrom<HashMap<String, AttributeValue>> for ShortUrl {
         let description = item
             .get("Description")
             .and_then(|c| c.as_s().map(|s| s.to_string()).ok());
+        let preview_image_url = item
+            .get("PreviewImageUrl")
+            .and_then(|c| c.as_s().map(|s| s.to_string()).ok());
 
         Ok(Self {
             link_id,
@@ -71,6 +75,7 @@ impl TryFrom<HashMap<String, AttributeValue>> for ShortUrl {
             content_type,
             title,
             description,
+            preview_image_url,
         })
     }
 }
@@ -118,6 +123,12 @@ impl UrlShortener {
         if let Some(ref content_type) = url_details.content_type {
             put_item = put_item.item("ContentType", AttributeValue::S(content_type.to_string()));
         }
+        if let Some(ref preview_image_url) = url_details.preview_image_url {
+            put_item = put_item.item(
+                "PreviewImageUrl",
+                AttributeValue::S(preview_image_url.to_string()),
+            )
+        }
 
         put_item
             .condition_expression("attribute_not_exists(LinkId)")
@@ -130,26 +141,10 @@ impl UrlShortener {
                 title: url_details.title,
                 description: url_details.description,
                 content_type: url_details.content_type,
+                preview_image_url: url_details.preview_image_url,
             })
             .map_err(|e| format!("Error adding item: {:?}", e))
     }
-
-    // pub async fn retrieve_url(&self, short_url: &str) -> Result<Option<String>, String> {
-    //     self.dynamodb_client
-    //         .get_item()
-    //         .table_name(&self.dynamodb_urls_table)
-    //         .key("LinkId", AttributeValue::S(short_url.to_string()))
-    //         .send()
-    //         .await
-    //         .map_err(|e| format!("Error getting item: {:?}", e))
-    //         .map(|record| {
-    //             record.item.and_then(|attributes| {
-    //                 attributes
-    //                     .get("OriginalLink")
-    //                     .and_then(|v| v.as_s().cloned().ok())
-    //             })
-    //         })
-    // }
 
     pub async fn retrieve_url_and_increment_clicks(
         &self,

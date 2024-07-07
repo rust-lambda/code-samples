@@ -6,4 +6,5 @@ members = [
   "src/chapter-02-challenge",
   "src/chapter-03",
   "src/chapter-04",
+  "src/chapter-04-challenge",
 ]
