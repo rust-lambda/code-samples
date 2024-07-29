@@ -1,0 +1,48 @@
+use lambda_http::{run, service_fn, tracing, Error, IntoResponse, Request, RequestPayloadExt};
+use shared::core::{ShortenUrlRequest, UrlShortener};
+use shared::url_info::UrlInfo;
+use shared::utils::generate_api_response;
+use std::env;
+
+async fn function_handler(
+    url_shortener: &UrlShortener,
+    event: Request,
+) -> Result<impl IntoResponse, Error> {
+    tracing::info!("Received event: {:?}", event);
+
+    let shorten_url_request_body = event.payload::<ShortenUrlRequest>()?;
+
+    match shorten_url_request_body {
+        None => generate_api_response(400, "Bad request"),
+        Some(shorten_url_request) => {
+            let shortened_url_response = url_shortener.shorten_url(shorten_url_request).await;
+
+            let response = match shortened_url_response {
+                Ok(response) => {
+                    generate_api_response(200, &serde_json::to_string(&response).unwrap())?
+                }
+                Err(e) => {
+                    tracing::error!("Failed to shorten URL: {:?}", e);
+                    generate_api_response(500, "Internal Server Error")?
+                }
+            };
+
+            Ok(response)
+        }
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Error> {
+    tracing::init_default_subscriber();
+    let table_name = env::var("TABLE_NAME").expect("TABLE_NAME is not set");
+    let config = aws_config::load_from_env().await;
+    let dynamodb_client = aws_sdk_dynamodb::Client::new(&config);
+    let http_client = shared::Client::builder()
+        .timeout(std::time::Duration::from_secs(2))
+        .build()?;
+    let url_info = UrlInfo::new(http_client);
+    let shortener = UrlShortener::new(&table_name, dynamodb_client, url_info);
+
+    run(service_fn(|event| function_handler(&shortener, event))).await
+}
