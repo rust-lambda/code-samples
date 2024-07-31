@@ -1,0 +1,97 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Globals:
+  Function:
+    Timeout: 3
+
+Resources:
+  VisitLinkFunction:
+    Metadata:
+      BuildMethod: rust-cargolambda
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/visit_link
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      Events:
+        GetLinks:
+          Type: HttpApi
+          Properties:
+            Path: /{linkId}
+            Method: GET
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref LinksTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LinksTable
+
+  CreateLinkFunction:
+    Metadata:
+      BuildMethod: rust-cargolambda
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/create_link
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      Events:
+        CreateLink:
+          Type: HttpApi
+          Properties:
+            Path: /links
+            Method: POST
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref LinksTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LinksTable
+
+  GetLinksFunction:
+    Metadata:
+      BuildMethod: rust-cargolambda
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambdas/get_links
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      Events:
+        GetLinks:
+          Type: HttpApi
+          Properties:
+            Path: /links
+            Method: GET
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref LinksTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref LinksTable
+
+  LinksTable:
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Type: AWS::DynamoDB::Table
+    Properties:
+      KeySchema:
+        - AttributeName: LinkId
+          KeyType: HASH
+      AttributeDefinitions:
+        - AttributeName: LinkId
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+
+Outputs:
+  LinksTableName:
+    Description: "LinksTable name"
+    Value: !Ref LinksTable
+  UrlShortenerEndpoint:
+    Description: "API endpoint"
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/"
