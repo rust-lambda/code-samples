@@ -1,11 +1,10 @@
-use std::collections::HashMap;
+use crate::core::{ShortUrl, UrlRepository};
 use async_trait::async_trait;
 use aws_sdk_dynamodb::{
     types::{AttributeValue, ReturnValue},
     Client,
 };
-
-use crate::core::{ShortUrl, UrlRepository};
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct DynamoDbUrlRepository {
@@ -16,8 +15,8 @@ pub struct DynamoDbUrlRepository {
 impl DynamoDbUrlRepository {
     pub fn new(dynamodb_urls_table: String, dynamodb_client: Client) -> Self {
         Self {
-            dynamodb_client: dynamodb_client,
-            dynamodb_urls_table: dynamodb_urls_table,
+            dynamodb_client,
+            dynamodb_urls_table,
         }
     }
 }

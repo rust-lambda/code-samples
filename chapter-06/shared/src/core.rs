@@ -4,7 +4,7 @@ use cuid2::CuidConstructor;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "mocks"))]
 use mockall::{automock, predicate::*};
 
 #[derive(Serialize, Deserialize)]
@@ -12,7 +12,7 @@ pub struct ShortenUrlRequest {
     url_to_shorten: String,
 }
 
-#[cfg_attr(test, automock)]
+#[cfg_attr(any(test, feature = "mocks"), automock)]
 #[async_trait]
 pub trait UrlRepository: Debug {
     async fn get_url_from_short_link(&self, short_link: &str) -> Result<Option<String>, String>;
@@ -28,26 +28,26 @@ pub trait UrlRepository: Debug {
     ) -> Result<(Vec<ShortUrl>, Option<String>), String>;
 }
 
-#[cfg_attr(test, automock)]
+#[cfg_attr(any(test, feature = "mocks"), automock)]
 #[async_trait]
 pub trait UrlInfo: Debug {
     async fn fetch_details(&self, url: &str) -> Result<UrlDetails, String>;
 }
 
 #[derive(Debug)]
-pub struct UrlShortener {
-    url_repo: Box<dyn UrlRepository + Send + Sync>,
-    url_info: Box<dyn UrlInfo + Send + Sync>,
+pub struct UrlShortener<R: UrlRepository, I: UrlInfo> {
+    url_repo: R,
+    url_info: I,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ShortUrl {
-    link_id: String,
-    original_link: String,
-    clicks: u32,
-    title: Option<String>,
-    description: Option<String>,
-    content_type: Option<String>,
+    pub link_id: String,
+    pub original_link: String,
+    pub clicks: u32,
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub content_type: Option<String>,
 }
 
 impl ShortUrl {
@@ -60,12 +60,12 @@ impl ShortUrl {
         content_type: Option<String>,
     ) -> Self {
         Self {
-            link_id: link_id,
-            original_link: original_link,
-            clicks: clicks,
-            title: title,
-            description: description,
-            content_type: content_type,
+            link_id,
+            original_link,
+            clicks,
+            title,
+            description,
+            content_type,
         }
     }
 }
@@ -76,11 +76,8 @@ pub struct ListShortUrlsResponse {
     last_evaluated_id: Option<String>,
 }
 
-impl UrlShortener {
-    pub fn new(
-        url_repo: Box<dyn UrlRepository + Send + Sync>,
-        url_info: Box<dyn UrlInfo + Send + Sync>,
-    ) -> Self {
+impl<R: UrlRepository, I: UrlInfo> UrlShortener<R, I> {
+    pub fn new(url_repo: R, url_info: I) -> Self {
         Self { url_repo, url_info }
     }
 
@@ -168,7 +165,7 @@ mod tests {
                 })
             });
 
-        let url_shortener = UrlShortener::new(Box::new(url_repo), Box::new(mock_url_info));
+        let url_shortener = UrlShortener::new(url_repo, mock_url_info);
 
         let result = url_shortener
             .shorten_url(ShortenUrlRequest {
@@ -176,7 +173,7 @@ mod tests {
             })
             .await;
 
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
 
         let short_url = result.unwrap();
         assert_eq!(short_url.original_link, test_url);
@@ -201,13 +198,13 @@ mod tests {
 
         let mock_url_info = MockUrlInfo::new();
 
-        let url_shortener = UrlShortener::new(Box::new(url_repo), Box::new(mock_url_info));
+        let url_shortener = UrlShortener::new(url_repo, mock_url_info);
 
         let result = url_shortener
             .retrieve_url_and_increment_clicks(test_short_url)
             .await;
 
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
 
         let short_url = result.unwrap();
         assert_eq!(short_url, Some("https://google.com".to_string()));
@@ -226,13 +223,13 @@ mod tests {
 
         let mock_url_info = MockUrlInfo::new();
 
-        let url_shortener = UrlShortener::new(Box::new(url_repo), Box::new(mock_url_info));
+        let url_shortener = UrlShortener::new(url_repo, mock_url_info);
 
         let result = url_shortener
             .retrieve_url_and_increment_clicks(test_short_url)
             .await;
 
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 
     #[tokio::test]
@@ -258,11 +255,11 @@ mod tests {
 
         let mock_url_info = MockUrlInfo::new();
 
-        let url_shortener = UrlShortener::new(Box::new(url_repo), Box::new(mock_url_info));
+        let url_shortener = UrlShortener::new(url_repo, mock_url_info);
 
         let result = url_shortener.list_urls(None).await;
 
-        assert_eq!(result.is_ok(), true);
+        assert!(result.is_ok());
     }
 
     #[tokio::test]
@@ -276,10 +273,10 @@ mod tests {
 
         let mock_url_info = MockUrlInfo::new();
 
-        let url_shortener = UrlShortener::new(Box::new(url_repo), Box::new(mock_url_info));
+        let url_shortener = UrlShortener::new(url_repo, mock_url_info);
 
         let result = url_shortener.list_urls(None).await;
 
-        assert_eq!(result.is_err(), true);
+        assert!(result.is_err());
     }
 }

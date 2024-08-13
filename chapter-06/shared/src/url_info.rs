@@ -1,8 +1,7 @@
+use crate::core::UrlInfo;
 use async_trait::async_trait;
 use reqwest::Client;
 use scraper::{selector::Selector, Html};
-
-use crate::core::UrlInfo;
 
 #[derive(Debug)]
 pub struct HttpUrlInfo {
