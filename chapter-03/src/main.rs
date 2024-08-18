@@ -5,7 +5,6 @@ use lambda_http::http::StatusCode;
 use lambda_http::{
     run, service_fn, tracing, Error, IntoResponse, Request, RequestExt, RequestPayloadExt, Response,
 };
-
 mod core;
 mod utils;
 
@@ -20,11 +19,11 @@ async fn function_handler(
             let shorten_url_request_body = event.payload::<ShortenUrlRequest>()?;
 
             match shorten_url_request_body {
-                None => generate_api_response(400, "Bad Request"),
+                None => generate_api_response(&StatusCode::BAD_REQUEST, "Bad Request"),
                 Some(shorten_url_request) => {
                     let shortened_url_response = url_shortener.shorten_url(shorten_url_request);
                     Ok(generate_api_response(
-                        200,
+                        &StatusCode::OK,
                         &serde_json::to_string(&shortened_url_response).unwrap(),
                     )?)
                 }
@@ -37,16 +36,16 @@ async fn function_handler(
                 .unwrap_or("");
 
             if link_id.is_empty() {
-                return generate_api_response(404, "Not Found");
+                return generate_api_response(&StatusCode::NOT_FOUND, "Not Found");
             }
 
             let full_url = url_shortener.retrieve_url(link_id);
 
             match full_url {
-                None => Ok(generate_api_response(404, "Not Found")?),
+                None => Ok(generate_api_response(&StatusCode::NOT_FOUND, "Not Found")?),
                 Some(url) => {
                     let response = Response::builder()
-                        .status(StatusCode::from_u16(302).unwrap())
+                        .status(&StatusCode::FOUND)
                         .header("Location", url)
                         .body("".to_string())
                         .map_err(Box::new)?;
@@ -55,7 +54,7 @@ async fn function_handler(
                 }
             }
         }
-        _ => generate_api_response(405, "Method Not Allowed"),
+        _ => generate_api_response(&StatusCode::METHOD_NOT_ALLOWED, "Method Not Allowed"),
     }
 }
 
