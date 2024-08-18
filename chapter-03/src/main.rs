@@ -1,5 +1,6 @@
 use crate::core::{ShortenUrlRequest, UrlShortener};
 use crate::utils::generate_api_response;
+use http::Method;
 use lambda_http::http::StatusCode;
 use lambda_http::{
     run, service_fn, tracing, Error, IntoResponse, Request, RequestExt, RequestPayloadExt, Response,
@@ -14,8 +15,8 @@ async fn function_handler(
 ) -> Result<impl IntoResponse, Error> {
     // Manually writing a router in Lambda is not a best practice, in practice you would either use seperate Lambda functions per endpoint or use a web framework like Actix or Axum inside Lambda.
     // This is purely for demonstration purposes to allow us to build a functioning URL shortener and share memory between GET and POST requests.
-    match event.method().as_str() {
-        "POST" => {
+    match event.method() {
+        &Method::POST => {
             let shorten_url_request_body = event.payload::<ShortenUrlRequest>()?;
 
             match shorten_url_request_body {
@@ -29,7 +30,7 @@ async fn function_handler(
                 }
             }
         }
-        "GET" => {
+        &Method::GET => {
             let link_id = event
                 .path_parameters_ref()
                 .and_then(|params| params.first("linkId"))
