@@ -16,17 +16,14 @@ async fn function_handler(
     // This is purely for demonstration purposes to allow us to build a functioning URL shortener and share memory between GET and POST requests.
     match event.method() {
         &Method::POST => {
-            let shorten_url_request_body = event.payload::<ShortenUrlRequest>()?;
-
-            match shorten_url_request_body {
-                None => generate_api_response(&StatusCode::BAD_REQUEST, "Bad Request"),
-                Some(shorten_url_request) => {
-                    let shortened_url_response = url_shortener.shorten_url(shorten_url_request);
-                    Ok(generate_api_response(
-                        &StatusCode::OK,
-                        &serde_json::to_string(&shortened_url_response).unwrap(),
-                    )?)
-                }
+            if let Some(shorten_url_request) = event.payload::<ShortenUrlRequest>()? {
+                let shortened_url_response = url_shortener.shorten_url(shorten_url_request);
+                Ok(generate_api_response(
+                    &StatusCode::OK,
+                    &serde_json::to_string(&shortened_url_response).unwrap(),
+                )?)
+            } else {
+                generate_api_response(&StatusCode::BAD_REQUEST, "Bad Request")
             }
         }
         &Method::GET => {
@@ -36,23 +33,21 @@ async fn function_handler(
                 .unwrap_or("");
 
             if link_id.is_empty() {
-                return generate_api_response(&StatusCode::NOT_FOUND, "Not Found");
+                generate_api_response(&StatusCode::NOT_FOUND, "Not Found")
+            
+            } else if let Some(url) = url_shortener.retrieve_url(link_id) {
+                let response = Response::builder()
+                    .status(&StatusCode::FOUND)
+                    .header("Location", url)
+                    .body("".to_string())
+                    .map_err(Box::new)?;
+
+                Ok(response)
+            
+            } else {
+                Ok(generate_api_response(&StatusCode::NOT_FOUND, "Not Found")?)
             }
 
-            let full_url = url_shortener.retrieve_url(link_id);
-
-            match full_url {
-                None => Ok(generate_api_response(&StatusCode::NOT_FOUND, "Not Found")?),
-                Some(url) => {
-                    let response = Response::builder()
-                        .status(&StatusCode::FOUND)
-                        .header("Location", url)
-                        .body("".to_string())
-                        .map_err(Box::new)?;
-
-                    Ok(response)
-                }
-            }
         }
         _ => generate_api_response(&StatusCode::METHOD_NOT_ALLOWED, "Method Not Allowed"),
     }
