@@ -20,12 +20,13 @@ async fn function_handler(
                 let shortened_url_response = url_shortener.shorten_url(shorten_url_request);
                 Ok(generate_api_response(
                     &StatusCode::OK,
-                    &serde_json::to_string(&shortened_url_response).unwrap(),
+                    serde_json::to_string(&shortened_url_response).unwrap(),
                 )?)
             } else {
-                generate_api_response(&StatusCode::BAD_REQUEST, "Bad Request")
+                generate_api_response(&StatusCode::BAD_REQUEST, "Bad Request".to_string())
             }
         }
+
         &Method::GET => {
             let link_id = event
                 .path_parameters_ref()
@@ -33,7 +34,7 @@ async fn function_handler(
                 .unwrap_or("");
 
             if link_id.is_empty() {
-                generate_api_response(&StatusCode::NOT_FOUND, "Not Found")
+                generate_api_response(&StatusCode::NOT_FOUND, "Not Found".to_string())
             
             } else if let Some(url) = url_shortener.retrieve_url(link_id) {
                 let response = Response::builder()
@@ -41,15 +42,14 @@ async fn function_handler(
                     .header("Location", url)
                     .body("".to_string())
                     .map_err(Box::new)?;
-
                 Ok(response)
             
             } else {
-                Ok(generate_api_response(&StatusCode::NOT_FOUND, "Not Found")?)
+                Ok(generate_api_response(&StatusCode::NOT_FOUND, "Not Found".to_string())?)
             }
-
         }
-        _ => generate_api_response(&StatusCode::METHOD_NOT_ALLOWED, "Method Not Allowed"),
+
+        _ => generate_api_response(&StatusCode::METHOD_NOT_ALLOWED, "Method Not Allowed".to_string()),
     }
 }
 
