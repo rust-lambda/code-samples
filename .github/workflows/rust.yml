@@ -1,0 +1,35 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        project:
+        - 'chapter-01'
+        - 'chapter-02'
+        - 'chapter-02-challenge'
+        - 'chapter-03'
+        - 'chapter-04'
+        - 'chapter-04-challenge'
+        - 'chapter-05'
+        - 'chapter-06'
+    
+    steps:
+    - uses: actions/checkout@v4
+    - name: Build
+      run: cargo build --verbose
+      working-directory: ${{ matrix.project }}
+    - name: Run tests
+      run: cargo test --verbose
+      working-directory: ${{ matrix.project }}
