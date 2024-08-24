@@ -1,9 +1,10 @@
-use lambda_http::http::StatusCode;
-use lambda_http::{run, service_fn, tracing, Error, IntoResponse, Request, RequestExt, Response};
+use lambda_http::{
+    http::StatusCode, run, service_fn, tracing, Error, IntoResponse, Request, RequestExt,
+};
 use shared::adapters::DynamoDbUrlRepository;
 use shared::core::{UrlInfo, UrlRepository, UrlShortener};
 use shared::url_info::HttpUrlInfo;
-use shared::utils::generate_api_response;
+use shared::utils::{empty_response, redirect_response};
 use std::env;
 
 async fn function_handler<R: UrlRepository, I: UrlInfo>(
@@ -18,7 +19,7 @@ async fn function_handler<R: UrlRepository, I: UrlInfo>(
         .unwrap_or("");
 
     if link_id.is_empty() {
-        return generate_api_response(404, "Not Found");
+        return empty_response(&StatusCode::NOT_FOUND);
     }
 
     let full_url = url_shortener
@@ -28,18 +29,10 @@ async fn function_handler<R: UrlRepository, I: UrlInfo>(
     match full_url {
         Err(e) => {
             tracing::error!("Failed to retrieve URL: {:?}", e);
-            Ok(generate_api_response(500, "Internal Server Error")?)
+            empty_response(&StatusCode::INTERNAL_SERVER_ERROR)
         }
-        Ok(None) => Ok(generate_api_response(404, "Not Found")?),
-        Ok(Some(url)) => {
-            let response = Response::builder()
-                .status(StatusCode::from_u16(302).unwrap())
-                .header("Location", url)
-                .body("".to_string())
-                .map_err(Box::new)?;
-
-            Ok(response)
-        }
+        Ok(None) => empty_response(&StatusCode::NOT_FOUND),
+        Ok(Some(url)) => redirect_response(&url),
     }
 }
 

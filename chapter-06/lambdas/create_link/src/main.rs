@@ -1,8 +1,10 @@
-use lambda_http::{run, service_fn, tracing, Error, IntoResponse, Request, RequestPayloadExt};
+use lambda_http::{
+    http::StatusCode, run, service_fn, tracing, Error, IntoResponse, Request, RequestPayloadExt,
+};
 use shared::adapters::DynamoDbUrlRepository;
 use shared::core::{ShortenUrlRequest, UrlInfo, UrlRepository, UrlShortener};
 use shared::url_info::HttpUrlInfo;
-use shared::utils::generate_api_response;
+use shared::utils::{empty_response, json_response};
 use std::env;
 
 async fn function_handler<R: UrlRepository, I: UrlInfo>(
@@ -14,21 +16,17 @@ async fn function_handler<R: UrlRepository, I: UrlInfo>(
     let shorten_url_request_body = event.payload::<ShortenUrlRequest>()?;
 
     match shorten_url_request_body {
-        None => generate_api_response(400, "Bad request"),
+        None => empty_response(&StatusCode::BAD_REQUEST),
         Some(shorten_url_request) => {
             let shortened_url_response = url_shortener.shorten_url(shorten_url_request).await;
 
-            let response = match shortened_url_response {
-                Ok(response) => {
-                    generate_api_response(200, &serde_json::to_string(&response).unwrap())?
-                }
+            match shortened_url_response {
+                Ok(response) => json_response(&StatusCode::OK, &response),
                 Err(e) => {
                     tracing::error!("Failed to shorten URL: {:?}", e);
-                    generate_api_response(500, "Internal Server Error")?
+                    empty_response(&StatusCode::INTERNAL_SERVER_ERROR)
                 }
-            };
-
-            Ok(response)
+            }
         }
     }
 }
