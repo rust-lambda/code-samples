@@ -1,11 +1,11 @@
 use crate::core::{ShortenUrlRequest, UrlShortener};
-use crate::utils::generate_api_response;
-use lambda_http::http::StatusCode;
 use lambda_http::{
-    run, service_fn, tracing, Error, IntoResponse, Request, RequestExt, RequestPayloadExt, Response,
+    http::{Method, StatusCode},
+    run, service_fn, tracing, Error, IntoResponse, Request, RequestExt, RequestPayloadExt,
 };
 use std::env;
 use url_info::UrlInfo;
+use utils::{empty_response, json_response, redirect_response};
 
 mod core;
 mod url_info;
@@ -16,58 +16,47 @@ async fn function_handler(
     event: Request,
 ) -> Result<impl IntoResponse, Error> {
     tracing::info!("Received event: {:?}", event);
-    match (event.method().as_str(), event.raw_http_path()) {
-        ("POST", "/links") => {
+    match (event.method(), event.raw_http_path()) {
+        (&Method::POST, "/links") => {
             let shorten_url_request_body = event.payload::<ShortenUrlRequest>()?;
 
             match shorten_url_request_body {
-                None => generate_api_response(400, "Bad request"),
+                None => empty_response(&StatusCode::BAD_REQUEST),
                 Some(shorten_url_request) => {
                     let shortened_url_response =
                         url_shortener.shorten_url(shorten_url_request).await;
 
-                    let response = match shortened_url_response {
-                        Ok(response) => {
-                            generate_api_response(200, &serde_json::to_string(&response).unwrap())?
-                        }
+                    match shortened_url_response {
+                        Ok(response) => json_response(&StatusCode::OK, &response),
                         Err(e) => {
                             tracing::error!("Failed to shorten URL: {:?}", e);
-                            generate_api_response(500, "Internal Server Error")?
+                            empty_response(&StatusCode::INTERNAL_SERVER_ERROR)
                         }
-                    };
-
-                    Ok(response)
+                    }
                 }
             }
         }
-        ("GET", "/links") => {
+        (&Method::GET, "/links") => {
             let query_params = event.query_string_parameters();
             let last_evaluated_id = query_params.first("last_evaluated_id");
 
             let links = url_shortener.list_urls(last_evaluated_id).await;
             match links {
-                Ok(links) => {
-                    let response = Response::builder()
-                        .status(StatusCode::OK)
-                        .header("content-type", "application/json")
-                        .body(serde_json::to_string(&links)?)
-                        .map_err(Box::new)?;
-                    Ok(response)
-                }
+                Ok(links) => json_response(&StatusCode::OK, &links),
                 Err(e) => {
                     tracing::error!("Failed to list URLs: {:?}", e);
-                    Ok(generate_api_response(500, "Internal Server Error")?)
+                    empty_response(&StatusCode::INTERNAL_SERVER_ERROR)
                 }
             }
         }
-        ("GET", _) => {
+        (&Method::GET, _) => {
             let link_id = event
                 .path_parameters_ref()
                 .and_then(|params| params.first("linkId"))
                 .unwrap_or("");
 
             if link_id.is_empty() {
-                return generate_api_response(404, "Not Found");
+                return empty_response(&StatusCode::NOT_FOUND);
             }
 
             let full_url = url_shortener
@@ -77,21 +66,13 @@ async fn function_handler(
             match full_url {
                 Err(e) => {
                     tracing::error!("Failed to retrieve URL: {:?}", e);
-                    Ok(generate_api_response(500, "Internal Server Error")?)
+                    empty_response(&StatusCode::INTERNAL_SERVER_ERROR)
                 }
-                Ok(None) => Ok(generate_api_response(404, "Not Found")?),
-                Ok(Some(url)) => {
-                    let response = Response::builder()
-                        .status(StatusCode::from_u16(302).unwrap())
-                        .header("Location", url)
-                        .body("".to_string())
-                        .map_err(Box::new)?;
-
-                    Ok(response)
-                }
+                Ok(None) => empty_response(&StatusCode::NOT_FOUND),
+                Ok(Some(url)) => redirect_response(&url),
             }
         }
-        _ => generate_api_response(405, "Method not allowed"),
+        _ => empty_response(&StatusCode::METHOD_NOT_ALLOWED),
     }
 }
 
