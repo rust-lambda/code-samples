@@ -17,7 +17,7 @@ async fn function_handler(
         Method::POST => {
             if let Some(shorten_url_request) = event.payload::<ShortenUrlRequest>()? {
                 let shortened_url_response = url_shortener.shorten_url(shorten_url_request);
-                Ok(json_response(&StatusCode::OK, &shortened_url_response)?)
+                json_response(&StatusCode::OK, &shortened_url_response)
             } else {
                 empty_response(&StatusCode::BAD_REQUEST)
             }
@@ -32,8 +32,7 @@ async fn function_handler(
             if link_id.is_empty() {
                 empty_response(&StatusCode::NOT_FOUND)
             } else if let Some(url) = url_shortener.retrieve_url(link_id) {
-                let response = redirect_response(&url)?;
-                Ok(response)
+                redirect_response(&url)
             } else {
                 Ok(empty_response(&StatusCode::NOT_FOUND)?)
             }
