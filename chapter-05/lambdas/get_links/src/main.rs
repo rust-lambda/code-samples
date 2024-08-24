@@ -1,8 +1,9 @@
-use lambda_http::http::StatusCode;
-use lambda_http::{run, service_fn, tracing, Error, IntoResponse, Request, RequestExt, Response};
+use lambda_http::{
+    http::StatusCode, run, service_fn, tracing, Error, IntoResponse, Request, RequestExt,
+};
 use shared::core::UrlShortener;
 use shared::url_info::UrlInfo;
-use shared::utils::generate_api_response;
+use shared::utils::{empty_response, json_response};
 use std::env;
 
 async fn function_handler(
@@ -16,17 +17,10 @@ async fn function_handler(
 
     let links = url_shortener.list_urls(last_evaluated_id).await;
     match links {
-        Ok(links) => {
-            let response = Response::builder()
-                .status(StatusCode::OK)
-                .header("content-type", "application/json")
-                .body(serde_json::to_string(&links)?)
-                .map_err(Box::new)?;
-            Ok(response)
-        }
+        Ok(links) => json_response(&StatusCode::OK, &links),
         Err(e) => {
             tracing::error!("Failed to list URLs: {:?}", e);
-            Ok(generate_api_response(500, "Internal Server Error")?)
+            empty_response(&StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
