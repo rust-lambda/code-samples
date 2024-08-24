@@ -2,8 +2,8 @@ use lambda_http::{
     http::StatusCode, run, service_fn, tracing, Error, IntoResponse, Request, RequestExt,
 };
 use shared::core::UrlShortener;
+use shared::response::{empty_response, redirect_response};
 use shared::url_info::UrlInfo;
-use shared::utils::{empty_response, redirect_response};
 use std::env;
 
 async fn function_handler(
