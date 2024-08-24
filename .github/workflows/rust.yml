@@ -23,7 +23,7 @@ jobs:
         - 'chapter-04'
         - 'chapter-04-challenge'
         - 'chapter-05'
-        # - 'chapter-06'
+        - 'chapter-06'
       fail-fast: false
     
     steps:
