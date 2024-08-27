@@ -29,7 +29,7 @@ async fn when_valid_link_is_passed_should_retrieve_info_and_store() {
     assert_eq!(response.status(), 200);
 
     let response_data: ShortUrl =
-        serde_json::from_str(response.text().await.unwrap().as_str()).unwrap();
+        serde_json::from_str(response.text().await.unwrap().as_str()).expect("Response to be a JSON string that successfully deserializes to a `ShortUrl` struct");
 
     assert_eq!(response_data.original_link, "https://google.com");
 
@@ -37,7 +37,7 @@ async fn when_valid_link_is_passed_should_retrieve_info_and_store() {
         .get(format!("{}{}", api_endpoint, response_data.link_id))
         .send()
         .await
-        .unwrap();
+        .expect("Accessing redirect should be successful.");
 
     assert_eq!(redirect_response.status(), 302);
 }
@@ -49,16 +49,16 @@ async fn retrieve_api_endpoint() -> String {
 
     let get_stacks = cloudformation_client
         .describe_stacks()
-        .set_stack_name(Some(stack_name))
+        .set_stack_name(Some(stack_name.clone()))
         .send()
         .await
-        .unwrap();
+        .expect(format!("CloudFormation stack named {} should exist", stack_name).as_str());
 
-    let outputs = get_stacks.stacks.unwrap()[0].clone().outputs.unwrap();
+    let outputs = get_stacks.stacks.expect("Get stack request should return an array")[0].clone().outputs.expect("The first stack in the get stacks response should have outputs");
     let api_outputs: Vec<Output> = outputs
         .into_iter()
         .filter(|output| output.output_key.clone().unwrap() == "UrlShortenerEndpoint")
         .collect();
 
-    api_outputs[0].clone().output_value.unwrap()
+    api_outputs[0].clone().output_value.expect("CloudFormation stack should have an output named `UrlShortenerEndpoint`")
 }
