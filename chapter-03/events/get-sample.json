@@ -1,6 +1,6 @@
 {
-	"resource": "/a-random-url",
-	"path": "/a-random-url",
+	"resource": "/someId",
+	"path": "/someId",
 	"httpMethod": "GET",
 	"headers": {
 		"Accept": "*/*",
@@ -23,16 +23,11 @@
 		"X-Forwarded-Port": "443",
 		"X-Forwarded-Proto": "https"
 	},
-	"multiValueHeaders": {
-	},
-	"queryStringParameters": {
-	},
-	"multiValueQueryStringParameters": {
-	},
-	"pathParameters": {
-	},
-	"stageVariables": {
-	},
+	"multiValueHeaders": {},
+	"queryStringParameters": {},
+	"multiValueQueryStringParameters": {},
+	"pathParameters": {},
+	"stageVariables": {},
 	"requestContext": {
 		"accountId": "12345678912",
 		"resourceId": "roq9wj",
