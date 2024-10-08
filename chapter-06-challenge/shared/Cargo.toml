@@ -1,0 +1,26 @@
+[package]
+name = "shared"
+version = "0.1.0"
+edition = "2021"
+resolver = "2"
+
+[features]
+mocks = ["dep:mockall"]
+
+[dependencies]
+scraper = "0.16"
+cuid2 = "0.1"
+serde = "1.0"
+serde_json = "1.0"
+aws-sdk-dynamodb = "1.31"
+reqwest = { version = "0.12", default-features = false, features = [
+  "rustls-tls",
+  "http2",
+] }
+lambda_http = "0.11"
+async-trait = "0.1.81"
+mockall = { version = "0.13", optional = true }
+
+[dev-dependencies]
+mockall = "0.13"
+tokio = { version = "1.38", features = ["macros", "rt-multi-thread"] }

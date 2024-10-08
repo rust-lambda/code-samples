@@ -1,3 +1,4 @@
+use lambda_http::tracing::warn;
 use lambda_http::{
     http::StatusCode, run, service_fn, tracing, Error, IntoResponse, Request, RequestPayloadExt,
 };
@@ -13,21 +14,29 @@ async fn function_handler<R: UrlRepository, I: UrlInfo>(
 ) -> Result<impl IntoResponse, Error> {
     tracing::info!("Received event: {:?}", event);
 
-    let shorten_url_request_body = event.payload::<ShortenUrlRequest>()?;
+    let request_body = event.payload::<ShortenUrlRequest>();
 
-    match shorten_url_request_body {
-        None => empty_response(&StatusCode::BAD_REQUEST),
-        Some(shorten_url_request) => {
-            let shortened_url_response = url_shortener.shorten_url(shorten_url_request).await;
-
-            match shortened_url_response {
-                Ok(response) => json_response(&StatusCode::OK, &response),
-                Err(e) => {
-                    tracing::error!("Failed to shorten URL: {:?}", e);
-                    empty_response(&StatusCode::INTERNAL_SERVER_ERROR)
+    match request_body {
+        Ok(shorten_url_request_body) => {
+            match shorten_url_request_body {
+                None => empty_response(&StatusCode::BAD_REQUEST),
+                Some(shorten_url_request) => {
+                    let shortened_url_response = url_shortener.shorten_url(shorten_url_request).await;
+        
+                    match shortened_url_response {
+                        Ok(response) => json_response(&StatusCode::OK, &response),
+                        Err(e) => {
+                            tracing::error!("Failed to shorten URL: {:?}", e);
+                            empty_response(&StatusCode::INTERNAL_SERVER_ERROR)
+                        }
+                    }
                 }
             }
-        }
+        },
+        Err(_) => {
+            warn!("Input event could not be deserialized into a ShortenUrlRequest struct");
+            empty_response(&StatusCode::BAD_REQUEST)
+        },
     }
 }
 
@@ -37,7 +46,7 @@ async fn main() -> Result<(), Error> {
     let table_name = env::var("TABLE_NAME").expect("TABLE_NAME is not set");
     let config = aws_config::load_from_env().await;
     let dynamodb_client = aws_sdk_dynamodb::Client::new(&config);
-    
+
     let http_client = shared::Client::builder()
         .timeout(std::time::Duration::from_secs(2))
         .build()?;
@@ -117,11 +126,30 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn when_invalid_body_is_passed_should_return_400() {
+    async fn when_empty_body_is_passed_should_return_400() {
         let mock_url_repo = MockUrlRepository::default();
         let mock_url_info = MockUrlInfo::default();
         let url_shortener = UrlShortener::new(mock_url_repo, mock_url_info);
         let request = Request::builder().body(Body::Empty).unwrap();
+
+        let result = function_handler(&url_shortener, request).await;
+
+        let data = result.unwrap().into_response().await;
+        assert_eq!(data.status(), 400);
+    }
+
+    #[tokio::test]
+    async fn when_invalid_body_is_passed_should_return_400() {
+        let mock_url_repo = MockUrlRepository::default();
+        let mock_url_info = MockUrlInfo::default();
+        let url_shortener = UrlShortener::new(mock_url_repo, mock_url_info);
+        let request = Request::builder()
+            .body(
+                json!({"this_is_not_a_valid_body": "https://google.com"})
+                    .to_string()
+                    .into(),
+            )
+            .unwrap();
 
         let result = function_handler(&url_shortener, request).await;
 

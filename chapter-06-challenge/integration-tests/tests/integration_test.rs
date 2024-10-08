@@ -41,6 +41,31 @@ async fn when_valid_link_is_passed_should_retrieve_info_and_store() {
     assert_eq!(redirect_response.status(), 302);
 }
 
+
+#[tokio::test]
+async fn when_invalid_body_is_passed_application_should_return_400_error() {
+    let api_endpoint = retrieve_api_endpoint().await;
+
+    let http_client = Client::builder()
+        .timeout(std::time::Duration::from_secs(2))
+        .redirect(Policy::none())
+        .build()
+        .unwrap();
+
+    let result = http_client
+        .post(format!("{}links", api_endpoint))
+        .header("Content-Type", "application/json")
+        .body(serde_json::json!({"this_is_not_a_valid_body": "https://google.com"}).to_string())
+        .send()
+        .await;
+
+    assert!(result.is_ok());
+
+    let response = result.unwrap();
+
+    assert_eq!(response.status(), 400);
+}
+
 async fn retrieve_api_endpoint() -> String {
     let config = aws_config::load_from_env().await;
     let cloudformation_client = aws_sdk_cloudformation::Client::new(&config);
