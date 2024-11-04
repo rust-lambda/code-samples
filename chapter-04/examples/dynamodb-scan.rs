@@ -5,7 +5,7 @@ use std::env;
 async fn main() {
     let table_name = env::var("TABLE_NAME").expect("TABLE_NAME is not set");
     let last_evaluated_key = env::args().nth(1);
-    let config = aws_config::load_from_env().await;
+    let config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
     let dynamodb_client = aws_sdk_dynamodb::Client::new(&config);
 
     let mut scan = dynamodb_client.scan().table_name(&table_name).limit(4);

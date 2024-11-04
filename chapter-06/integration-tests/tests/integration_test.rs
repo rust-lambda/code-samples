@@ -1,3 +1,4 @@
+use aws_config::BehaviorVersion;
 use aws_sdk_cloudformation::types::Output;
 use reqwest::redirect::Policy;
 use reqwest::Client;
@@ -42,7 +43,7 @@ async fn when_valid_link_is_passed_should_retrieve_info_and_store() {
 }
 
 async fn retrieve_api_endpoint() -> String {
-    let config = aws_config::load_from_env().await;
+    let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
     let cloudformation_client = aws_sdk_cloudformation::Client::new(&config);
     let stack_name = env::var("STACK_NAME").unwrap_or("rust-link-shorten".to_string());
     let env = env::var("ENV").expect("The current environment should be set using the 'ENV' environment variable");

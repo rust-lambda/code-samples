@@ -40,7 +40,7 @@ async fn function_handler<R: UrlRepository, I: UrlInfo>(
 async fn main() -> Result<(), Error> {
     tracing::init_default_subscriber();
     let table_name = env::var("TABLE_NAME").expect("TABLE_NAME is not set");
-    let config = aws_config::load_from_env().await;
+    let config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
     let dynamodb_client = aws_sdk_dynamodb::Client::new(&config);
     let http_client = shared::Client::builder()
         .timeout(std::time::Duration::from_secs(2))

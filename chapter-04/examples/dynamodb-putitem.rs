@@ -5,7 +5,7 @@ use std::env;
 async fn main() {
     let table_name = env::var("TABLE_NAME").expect("TABLE_NAME is not set");
 
-    let config = aws_config::load_from_env().await;
+    let config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
     let dynamodb_client = aws_sdk_dynamodb::Client::new(&config);
 
     let result = dynamodb_client
