@@ -49,7 +49,7 @@ Resources:
         Variables:
           TABLE_NAME: !Ref LinksTable
       Policies:
-        - DynamoDBCrudPolicy:
+        - DynamoDBWritePolicy:
             TableName: !Ref LinksTable
 
   GetLinksFunction:
