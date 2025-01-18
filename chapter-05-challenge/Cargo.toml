@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = [
+  "shared",
+  "lambdas/create_link",
+  "lambdas/get_links",
+  "lambdas/visit_link",
+]
