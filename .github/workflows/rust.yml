@@ -2,9 +2,9 @@ name: Rust
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 env:
   CARGO_TERM_COLOR: always
@@ -16,21 +16,23 @@ jobs:
     strategy:
       matrix:
         project:
-        - 'chapter-01'
-        - 'chapter-02'
-        - 'chapter-02-challenge'
-        - 'chapter-03'
-        - 'chapter-04'
-        - 'chapter-04-challenge'
-        - 'chapter-05'
-        - 'chapter-06'
+          - "chapter-01"
+          - "chapter-02"
+          - "chapter-02-challenge"
+          - "chapter-03"
+          - "chapter-04"
+          - "chapter-04-challenge"
+          - "chapter-05"
+          - "chapter-06/lambdas/create_link"
+          - "chapter-06/lambdas/get_links"
+          - "chapter-06/lambdas/visit_link"
       fail-fast: false
-    
+
     steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --verbose
-      working-directory: ${{ matrix.project }}
-    - name: Run tests
-      run: cargo test --verbose
-      working-directory: ${{ matrix.project }}
+      - uses: actions/checkout@v4
+      - name: Build
+        run: cargo build --verbose
+        working-directory: ${{ matrix.project }}
+      - name: Run tests
+        run: cargo test --verbose
+        working-directory: ${{ matrix.project }}
