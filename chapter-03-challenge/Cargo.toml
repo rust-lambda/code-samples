@@ -1,0 +1,16 @@
+[package]
+name = "serverless-link-shortener-chapter-03"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lambda_http = "0.14.0"
+tokio = { version = "1", features = ["macros"] }
+serde = "1.0.203"
+serde_json = "1.0.117"
+cuid2 = "0.1.2"
+
+[[bin]]
+name = "serverless_link_shortener"
+path = "src/main.rs"
+test = false
