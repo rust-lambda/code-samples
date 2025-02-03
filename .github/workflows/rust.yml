@@ -26,6 +26,9 @@ jobs:
           - "chapter-06/lambdas/create_link"
           - "chapter-06/lambdas/get_links"
           - "chapter-06/lambdas/visit_link"
+          - "chapter-06-challenge/lambdas/create_link"
+          - "chapter-06-challenge/lambdas/get_links"
+          - "chapter-06-challenge/lambdas/visit_link"
       fail-fast: false
 
     steps:
