@@ -23,6 +23,11 @@ Resources:
           Properties:
             Path: /links
             Method: POST
+        ListAllUrls:
+          Type: HttpApi
+          Properties:
+            Path: /links
+            Method: GET
         VisitShortUrl:
           Type: HttpApi
           Properties:

@@ -15,6 +15,5 @@ Cargo.lock
 .DS_Store
 
 **/.aws-sam/*
-**/samconfig.toml
 
 **/.idea/*
