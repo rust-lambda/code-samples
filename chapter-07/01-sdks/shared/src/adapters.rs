@@ -52,9 +52,8 @@ impl<'a> UrlRepository for DynamoDbUrlRepository<'a> {
         match result {
             Err(e) => {
                 let generic_err_msg = format!("Error incrementing clicks: {:?}", e);
-                if e.into_service_error()
-                    .is_conditional_check_failed_exception()
-                {
+                let service_error = e.into_service_error();
+                if service_error.is_conditional_check_failed_exception() {
                     Ok(None)
                 } else {
                     Err(generic_err_msg)
