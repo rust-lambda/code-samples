@@ -58,7 +58,10 @@ impl Configuration {
 
         let configuration_ssm_parameter_name = match configuration_ssm_parameter_name {
             Ok(name) => name,
-            Err(_) => String::new(),
+            Err(e) => {
+                eprintln!("Failed to load configuration parameter name: {:?}", e);
+                String::new()
+            }
         };
         if configuration_ssm_parameter_name.len() > 0 {
             let ssm_configuration = ssm_client
