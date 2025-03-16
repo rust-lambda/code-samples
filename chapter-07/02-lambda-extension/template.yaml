@@ -1,0 +1,138 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  Env:
+    Description: The deployment environment
+    Type: String
+
+Globals:
+  Function:
+    Timeout: 3
+    Layers:
+      - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:015030872274:layer:AWS-Parameters-and-Secrets-Lambda-Extension-Arm64:12
+    Environment:
+      Variables:
+        APP_TABLE_NAME: !Ref LinksTable
+        CONFIGURATION_PARAMETER_NAME: !Ref ApplicationConfiguration
+        SECRET_MANAGER_SECRET_ID: !GetAtt ApplicationSecret.Id
+        # Use a higher value in production, this will only cache for 10 seconds
+        SSM_PARAMETER_STORE_TTL: 10
+        SECRETS_MANAGER_TTL: 10
+        PARAMETERS_SECRETS_EXTENSION_HTTP_PORT: 2773
+
+Resources:
+  ApplicationConfiguration:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub /${Env}/url-shortener/config
+      Type: String
+      Value: "{\"log_level\": \"INFO\"}"
+  
+  ApplicationSecret:
+    Type: 'AWS::SecretsManager::Secret'
+    Properties:
+      Name: ApiKeySecret
+      Description: This secret includes the API key for the application
+      SecretString: '{"api_key":"This is a random API key"}'
+
+  VisitLinkFunction:
+    Metadata:
+      BuildMethod: rust-cargolambda
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./lambdas/visit_link
+      Handler: bootstrap
+      FunctionName: !Sub VisitLinkFunction-${Env}
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      Events:
+        GetLinks:
+          Type: HttpApi
+          Properties:
+            Path: /{linkId}
+            Method: GET
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LinksTable
+        - SSMParameterReadPolicy:
+            ParameterName: !Sub ${Env}/url-shortener/config
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !Ref ApplicationSecret
+
+  CreateLinkFunction:
+    Metadata:
+      BuildMethod: rust-cargolambda
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./lambdas/create_link
+      Handler: bootstrap
+      FunctionName: !Sub CreateLinkFunction-${Env}
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      Events:
+        CreateLink:
+          Type: HttpApi
+          Properties:
+            Path: /links
+            Method: POST
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref LinksTable
+        - SSMParameterReadPolicy:
+            ParameterName: !Sub ${Env}/url-shortener/config
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !Ref ApplicationSecret
+
+  GetLinksFunction:
+    Metadata:
+      BuildMethod: rust-cargolambda
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./lambdas/get_links
+      Handler: bootstrap
+      FunctionName: !Sub GetLinksFunction-${Env}
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      Events:
+        GetLinks:
+          Type: HttpApi
+          Properties:
+            Path: /links
+            Method: GET
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref LinksTable
+        - SSMParameterReadPolicy:
+            ParameterName: !Sub ${Env}/url-shortener/config
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !Ref ApplicationSecret
+
+  LinksTable:
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub LinksTable-${Env}
+      KeySchema:
+        - AttributeName: LinkId
+          KeyType: HASH
+      AttributeDefinitions:
+        - AttributeName: LinkId
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+
+Outputs:
+  LinksTableName:
+    Description: "LinksTable name"
+    Export:
+      Name: !Sub LinksTableName-${Env}
+    Value: !Ref LinksTable
+  UrlShortenerEndpoint:
+    Description: "API endpoint"
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/"
+    Export:
+      Name: !Sub UrlShortenerEndpoint-${Env}

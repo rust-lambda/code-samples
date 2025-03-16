@@ -1,0 +1,17 @@
+[package]
+name = "get_links"
+version = "0.1.0"
+edition = "2021"
+resolver = "2"
+
+[dependencies]
+shared = { path = "../../shared" }
+lambda_http = "0.14"
+tokio = { version = "1.38", features = ["macros", "rt-multi-thread"] }
+aws-config = { version = "1.1", features = ["behavior-version-latest"] }
+aws-sdk-dynamodb = "1.31"
+serde_json = "1.0"
+
+[dev-dependencies]
+shared = { path = "../../shared", features = ["mocks"] }
+mockall = "0.13"
