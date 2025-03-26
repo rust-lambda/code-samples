@@ -16,6 +16,7 @@ Globals:
         SECRET_MANAGER_SECRET_ID: !GetAtt ApplicationSecret.Id
 
 Resources:
+  # Creating parameters and secrets should generally be done in a separate stack, this is for demonstration purposes only.
   ApplicationConfiguration:
     Type: AWS::SSM::Parameter
     Properties:
