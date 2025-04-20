@@ -11,7 +11,7 @@ export class RustyLambdaStack extends cdk.Stack {
 
     // defines the Rust function
     const helloWorldApi = new RustFunction(this, 'Rust function', {
-      manifestPath: join(__dirname, '..', 'hello-world-api', 'Cargo.toml'),
+      manifestPath: join(__dirname, '..', '..', 'src', 'hello-world-api', 'Cargo.toml'),
     });
 
     // adds a URL to the Rust function
