@@ -12,15 +12,19 @@ pub trait Config {
     async fn refresh(&self) -> Configuration;
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub enum LogLevel {
+// The LogLevel enum is here to illustrate how to parse an enum from configuration, in the `real world`
+// you would typically use a LogLevel that comes from a logging crate.
+// you'll see that in the chapter on observability
+#[derive(Default, Debug, Serialize, Deserialize)]
+pub(crate) enum LogLevel {
     TRACE,
+    #[default]
     INFO,
     WARN,
     ERROR,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Configuration {
     pub(crate) table_name: String,
     pub(crate) log_level: LogLevel,
@@ -185,16 +189,6 @@ impl std::fmt::Display for Configuration {
                 self.table_name, self.log_level, self.api_key
             ),
             _ => write!(f, "Configuration loaded successfully",),
-        }
-    }
-}
-
-impl Default for Configuration {
-    fn default() -> Configuration {
-        Configuration {
-            table_name: "".to_string(),
-            log_level: LogLevel::INFO,
-            api_key: "".to_string(),
         }
     }
 }
