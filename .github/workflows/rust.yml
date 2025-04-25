@@ -29,6 +29,14 @@ jobs:
           - "chapter-06-challenge/lambdas/create_link"
           - "chapter-06-challenge/lambdas/get_links"
           - "chapter-06-challenge/lambdas/visit_link"
+          - "chapter-07/01-sdks/lambdas/create_link"
+          - "chapter-07/01-sdks/lambdas/get_links"
+          - "chapter-07/01-sdks/lambdas/visit_link"
+          - "chapter-07/01-sdks/shared"
+          - "chapter-07/02-lambda-extension/lambdas/create_link"
+          - "chapter-07/02-lambda-extension/lambdas/get_links"
+          - "chapter-07/02-lambda-extension/lambdas/visit_link"
+          - "chapter-07/02-lambda-extension/shared"
       fail-fast: false
 
     steps:
