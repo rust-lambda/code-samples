@@ -12,25 +12,8 @@ Globals:
     Environment:
       Variables:
         APP_TABLE_NAME: !Ref LinksTable
-        CONFIGURATION_PARAMETER_NAME: !Ref ApplicationConfiguration
-        SECRET_MANAGER_SECRET_ID: !GetAtt ApplicationSecret.Id
 
-Resources:
-  # Creating parameters and secrets should generally be done in a separate stack, this is for demonstration purposes only.
-  ApplicationConfiguration:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub /${Env}/url-shortener/config
-      Type: String
-      Value: "{\"log_level\": \"INFO\"}"
-  
-  ApplicationSecret:
-    Type: 'AWS::SecretsManager::Secret'
-    Properties:
-      Name: ApiKeySecret
-      Description: This secret includes the API key for the application
-      SecretString: '{"api_key":"This is a random API key"}'
-
+Resources:  
   VisitLinkFunction:
     Metadata:
       BuildMethod: rust-cargolambda
@@ -51,10 +34,6 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref LinksTable
-        - SSMParameterReadPolicy:
-            ParameterName: !Sub ${Env}/url-shortener/config
-        - AWSSecretsManagerGetSecretValuePolicy:
-            SecretArn: !Ref ApplicationSecret
 
   CreateLinkFunction:
     Metadata:

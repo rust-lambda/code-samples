@@ -1,30 +1,43 @@
+use crate::event_publisher::EventPublisher;
 use lambda_http::RequestPayloadExt;
 use lambda_http::{http::StatusCode, tracing, Error, IntoResponse, Request};
-use shared::core::{ShortenUrlRequest, UrlInfo, UrlRepository, UrlShortener};
+use serde::{Deserialize, Serialize};
+use shared::core::{IdGenerator, UrlRepository};
 use shared::utils::{empty_response, json_response};
 
-pub(crate) async fn function_handler<R: UrlRepository, I: UrlInfo>(
-    url_shortener: &UrlShortener<R, I>,
+#[derive(Serialize, Deserialize)]
+pub struct ShortenUrlRequest {
+    pub url_to_shorten: String,
+}
+pub(crate) struct HandlerDeps<I: IdGenerator, R: UrlRepository, E: EventPublisher> {
+    pub id_generator: I,
+    pub url_repo: R,
+    pub event_publisher: E,
+}
+
+pub(crate) async fn function_handler<I: IdGenerator, R: UrlRepository, E: EventPublisher>(
+    deps: &HandlerDeps<I, R, E>,
     event: Request,
 ) -> Result<impl IntoResponse, Error> {
     tracing::info!("Received event: {:?}", event);
 
     let shorten_url_request_body = event.payload::<ShortenUrlRequest>()?;
-
-    match shorten_url_request_body {
-        None => empty_response(&StatusCode::BAD_REQUEST),
-        Some(shorten_url_request) => {
-            let shortened_url_response = url_shortener.shorten_url(shorten_url_request).await;
-
-            match shortened_url_response {
-                Ok(response) => json_response(&StatusCode::OK, &response),
-                Err(e) => {
-                    tracing::error!("Failed to shorten URL: {:?}", e);
-                    empty_response(&StatusCode::INTERNAL_SERVER_ERROR)
-                }
-            }
-        }
+    if shorten_url_request_body.is_none() {
+        return empty_response(&StatusCode::BAD_REQUEST);
     }
+    let url_to_shorten = shorten_url_request_body.unwrap().url_to_shorten;
+    let id = deps.id_generator.generate_id();
+    let saved = deps.url_repo.store_short_url(url_to_shorten, id).await;
+    if let Err(e) = &saved {
+        tracing::error!("Failed to shorten URL: {:?}", e);
+        return empty_response(&StatusCode::INTERNAL_SERVER_ERROR);
+    }
+    let short_url = saved.unwrap();
+    let publish_result = deps.event_publisher.publish_link_created(&short_url).await;
+    if let Err(e) = &publish_result {
+        tracing::error!("Failed to publish link created event: {:?}", e);
+    }
+    json_response(&StatusCode::OK, &short_url)
 }
 
 #[cfg(test)]
@@ -37,7 +50,6 @@ mod tests {
     use shared::core::MockUrlInfo;
     use shared::core::MockUrlRepository;
     use shared::core::ShortUrl;
-    use shared::core::UrlShortener;
     use shared::url_info::UrlDetails;
 
     #[tokio::test]

@@ -3,23 +3,9 @@ use figment::providers::{Env, Format, Json, Serialized};
 use figment::Figment;
 use serde::{Deserialize, Serialize};
 
-// The LogLevel enum is here to illustrate how to parse an enum from configuration, in the `real world`
-// you would typically use a LogLevel that comes from a logging crate.
-// you'll see that in the chapter on observability
-#[derive(Default, Debug, Serialize, Deserialize)]
-enum LogLevel {
-    TRACE,
-    #[default]
-    INFO,
-    WARN,
-    ERROR,
-}
-
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Configuration {
     pub table_name: String,
-    pub log_level: LogLevel,
-    pub api_key: String,
 }
 
 impl Configuration {
@@ -112,14 +98,7 @@ impl Configuration {
 
 impl std::fmt::Display for Configuration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.log_level {
-            LogLevel::TRACE | LogLevel::INFO => write!(
-                f,
-                "Configuration {{ table_name: {}, log_level: {:?}, api_key: {:?} }}",
-                self.table_name, self.log_level, self.api_key
-            ),
-            _ => write!(f, "Configuration loaded successfully",),
-        }
+        write!(f, "Configuration loaded successfully",)
     }
 }
 
@@ -130,7 +109,7 @@ mod tests {
         Figment,
     };
 
-    use crate::configuration::{Configuration, LogLevel};
+    use crate::configuration::Configuration;
 
     #[tokio::test]
     async fn when_valid_configuration_should_load() {
@@ -146,7 +125,6 @@ mod tests {
                 .unwrap();
 
             assert_eq!(config.table_name, "james-test-table");
-            assert!(matches!(config.log_level, LogLevel::INFO));
 
             Ok(())
         });
@@ -167,7 +145,6 @@ mod tests {
                 .unwrap();
 
             assert_eq!(config.table_name, "james-test-table-override");
-            assert!(matches!(config.log_level, LogLevel::INFO));
 
             Ok(())
         });
