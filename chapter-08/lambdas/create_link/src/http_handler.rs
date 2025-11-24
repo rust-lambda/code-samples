@@ -21,7 +21,9 @@ pub(crate) async fn function_handler<I: IdGenerator, R: UrlRepository, E: EventP
 ) -> Result<impl IntoResponse, Error> {
     tracing::info!("Received event: {:?}", event);
 
+    // TODO: handle bad request in the case the body is not valid JSON or missing fields
     let shorten_url_request_body = event.payload::<ShortenUrlRequest>()?;
+
     if shorten_url_request_body.is_none() {
         return empty_response(&StatusCode::BAD_REQUEST);
     }

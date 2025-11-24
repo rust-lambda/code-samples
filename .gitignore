@@ -17,3 +17,5 @@ Cargo.lock
 **/.aws-sam/*
 
 **/.idea/*
+
+samconfig.toml
