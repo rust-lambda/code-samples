@@ -126,7 +126,7 @@ impl std::fmt::Display for Configuration {
 #[cfg(test)]
 mod tests {
     use figment::{
-        providers::{Env, Format, Json},
+        providers::{Env, Format, Json, Serialized},
         Figment,
     };
 
@@ -137,10 +137,11 @@ mod tests {
         figment::Jail::expect_with(|jail| {
             jail.set_env("APP_TABLE_NAME", "james-test-table");
 
-            let config: Configuration = Figment::new()
+            let config: Configuration = Figment::from(Serialized::defaults(Configuration::default()))
                 .merge(Env::prefixed("APP_"))
                 .merge(Json::string(stringify!({
-                    "log_level": "INFO"
+                    "log_level": "INFO",
+                    "api_key": "test-api-key"
                 })))
                 .extract()
                 .unwrap();
@@ -157,17 +158,17 @@ mod tests {
         figment::Jail::expect_with(|jail| {
             jail.set_env("APP_TABLE_NAME", "james-test-table");
 
-            let config: Configuration = Figment::new()
+            let config: Configuration = Figment::from(Serialized::defaults(Configuration::default()))
                 .merge(Env::prefixed("APP_"))
-                .join(Json::string(stringify!({
-                    "table_name": "james-test-table-override",
-                    "log_level": "ERROR"
+                .merge(Json::string(stringify!({
+                    "api_key": "test-api-key"
                 })))
                 .extract()
                 .unwrap();
 
-            assert_eq!(config.table_name, "james-test-table-override");
+            assert_eq!(config.table_name, "james-test-table");
             assert!(matches!(config.log_level, LogLevel::INFO));
+            assert_eq!(config.api_key, "test-api-key");
 
             Ok(())
         });
