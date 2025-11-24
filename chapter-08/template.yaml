@@ -25,6 +25,10 @@ Resources:
       Runtime: provided.al2023
       Architectures:
         - arm64
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref LinksTable
+          STREAM_NAME: !Ref LinkClickedStream
       Events:
         GetLinks:
           Type: HttpApi
@@ -32,8 +36,18 @@ Resources:
             Path: /{linkId}
             Method: GET
       Policies:
-        - DynamoDBCrudPolicy:
+        - DynamoDBReadPolicy:
             TableName: !Ref LinksTable
+        # NOTE: No SAM policy template for Kinesis PutRecords (Write only)
+        #   so we define it inline here
+        - Statement:
+            Sid: KinesisPutRecordsPolicy
+            Effect: Allow
+            Action: 
+              - kinesis:PutRecord
+              - kinesis:PutRecords
+            Resource:
+              - !GetAtt LinkClickedStream.Arn
 
   CreateLinkFunction:
     Metadata:
@@ -46,6 +60,10 @@ Resources:
       Runtime: provided.al2023
       Architectures:
         - arm64
+      Environment:
+        Variables:
+          QUEUE_URL: !Ref LinkCreatedQueue
+          TABLE_NAME: !Ref LinksTable
       Events:
         CreateLink:
           Type: HttpApi
@@ -55,6 +73,8 @@ Resources:
       Policies:
         - DynamoDBWritePolicy:
             TableName: !Ref LinksTable
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt LinkCreatedQueue.QueueName
 
   GetLinksFunction:
     Metadata:
@@ -67,6 +87,9 @@ Resources:
       Runtime: provided.al2023
       Architectures:
         - arm64
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref LinksTable
       Events:
         GetLinks:
           Type: HttpApi
@@ -83,6 +106,8 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: !Sub LinksTable-${Env}
+      SSESpecification:
+        SSEEnabled: true
       KeySchema:
         - AttributeName: LinkId
           KeyType: HASH
@@ -90,13 +115,47 @@ Resources:
         - AttributeName: LinkId
           AttributeType: S
       BillingMode: PAY_PER_REQUEST
+  
+  LinkCreatedQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      QueueName: !Sub LinkCreatedQueue-${Env}
+      MessageRetentionPeriod: 86400 # 1 day
+      RedrivePolicy: 
+        deadLetterTargetArn: !GetAtt LinkCreatedDLQ.Arn
+        maxReceiveCount: 3
+
+  LinkCreatedDLQ:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      QueueName: !Sub LinkCreatedDLQ-${Env}
+      MessageRetentionPeriod: 1209600 # 14 days
+
+  LinkClickedStream:
+    Type: AWS::Kinesis::Stream
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Name: !Sub LinkClickedStream-${Env}
+      StreamModeDetails:
+        StreamMode: ON_DEMAND
+      RetentionPeriodHours: 24
 
 Outputs:
   LinksTableName:
     Description: "LinksTable name"
+    Value: !Ref LinksTable
     Export:
       Name: !Sub LinksTableName-${Env}
-    Value: !Ref LinksTable
+  LinkCreatedQueueUrl:
+    Description: "LinkCreatedQueue URL"
+    Value: !Ref LinkCreatedQueue
+    Export: 
+      Name: !Sub LinkCreatedQueueUrl-${Env}
   UrlShortenerEndpoint:
     Description: "API endpoint"
     Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/"
