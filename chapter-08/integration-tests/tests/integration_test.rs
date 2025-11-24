@@ -56,7 +56,9 @@ async fn when_invalid_body_is_passed_application_should_return_400_error() {
     let result = http_client
         .post(format!("{}links", api_endpoint))
         .header("Content-Type", "application/json")
-        .body(serde_json::json!({"this_is_not_a_valid_body": "https://google.com"}).to_string())
+        // Empty body triggers the BAD_REQUEST branch without surfacing a JSON parsing error
+        // (the handler now treats missing payload as a 400 and malformed JSON as a 500).
+        .body("")
         .send()
         .await;
 

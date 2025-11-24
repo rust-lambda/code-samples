@@ -42,43 +42,44 @@ pub(crate) async fn function_handler<I: IdGenerator, R: UrlRepository, E: EventP
 
 #[cfg(test)]
 mod tests {
-    use crate::function_handler;
+    use super::function_handler;
+    use crate::event_publisher::MockEventPublisher;
+    use crate::http_handler::HandlerDeps;
     use lambda_http::http::Request;
-    use lambda_http::Body;
-    use lambda_http::IntoResponse;
+    use lambda_http::{Body, IntoResponse};
+    use mockall::predicate::{eq, function};
     use serde_json::{json, Value};
-    use shared::core::MockUrlInfo;
-    use shared::core::MockUrlRepository;
-    use shared::core::ShortUrl;
-    use shared::url_info::UrlDetails;
+    use shared::core::{MockIdGenerator, MockUrlRepository, ShortUrl};
 
     #[tokio::test]
-    async fn when_valid_link_is_passed_should_store_and_return_details() {
+    async fn when_valid_link_is_passed_should_store_publish_and_return_details() {
         let mut mock_url_repo = MockUrlRepository::default();
-        let mut mock_url_info = MockUrlInfo::default();
-        mock_url_repo.expect_store_short_url().times(1).returning(
-            |url_to_shorten, _short_url, url_details| {
-                Ok(ShortUrl::new(
-                    "12345689".to_string(),
-                    url_to_shorten,
-                    0,
-                    url_details.title,
-                    url_details.description,
-                    url_details.content_type,
-                ))
-            },
-        );
-        mock_url_info
-            .expect_fetch_details()
+        let mut mock_id_generator = MockIdGenerator::new();
+        mock_id_generator
+            .expect_generate_id()
             .times(1)
-            .returning(|_url| {
-                Ok(UrlDetails {
-                    content_type: Some("text/html".to_string()),
-                    title: Some("Google".to_string()),
-                    description: Some("Test description".to_string()),
-                })
-            });
-        let url_shortener = UrlShortener::new(mock_url_repo, mock_url_info);
+            .return_const("12345689".to_string());
+        mock_url_repo
+            .expect_store_short_url()
+            .with(
+                eq("https://google.com".to_string()),
+                eq("12345689".to_string()),
+            )
+            .times(1)
+            .returning(|url_to_shorten, short_link| Ok(ShortUrl::new(short_link, url_to_shorten)));
+        let mut event_publisher = MockEventPublisher::new();
+        event_publisher
+            .expect_publish_link_created()
+            .times(1)
+            .with(function(|short_url: &ShortUrl| {
+                short_url.link_id == "12345689"
+            }))
+            .returning(|_| Ok(()));
+        let deps = HandlerDeps {
+            id_generator: mock_id_generator,
+            url_repo: mock_url_repo,
+            event_publisher,
+        };
         let request = Request::builder()
             .header("Content-Type", "application/json")
             .body(
@@ -88,7 +89,7 @@ mod tests {
             )
             .unwrap();
 
-        let result = function_handler(&url_shortener, request).await;
+        let result = function_handler(&deps, request).await;
 
         assert!(result.is_ok());
         let data = result.unwrap().into_response().await;
@@ -100,9 +101,9 @@ mod tests {
                 "link_id": "12345689",
                 "original_link": "https://google.com",
                 "clicks": 0,
-                "title": "Google",
-                "description": "Test description",
-                "content_type": "text/html"
+                "title": null,
+                "description": null,
+                "content_type": null
             })
         );
     }
@@ -110,11 +111,17 @@ mod tests {
     #[tokio::test]
     async fn when_invalid_body_is_passed_should_return_400() {
         let mock_url_repo = MockUrlRepository::default();
-        let mock_url_info = MockUrlInfo::default();
-        let url_shortener = UrlShortener::new(mock_url_repo, mock_url_info);
+        let mock_id_generator = MockIdGenerator::new();
+        let mut event_publisher = MockEventPublisher::new();
+        event_publisher.expect_publish_link_created().times(0);
+        let deps = HandlerDeps {
+            id_generator: mock_id_generator,
+            url_repo: mock_url_repo,
+            event_publisher,
+        };
         let request = Request::builder().body(Body::Empty).unwrap();
 
-        let result = function_handler(&url_shortener, request).await;
+        let result = function_handler(&deps, request).await;
 
         let data = result.unwrap().into_response().await;
         assert_eq!(data.status(), 400);
@@ -123,21 +130,22 @@ mod tests {
     #[tokio::test]
     async fn when_valid_body_is_passed_and_storage_fails_should_return_500() {
         let mut mock_url_repo = MockUrlRepository::default();
-        let mut mock_url_info = MockUrlInfo::default();
-        mock_url_repo.expect_store_short_url().times(1).returning(
-            |_url_to_shorten, _short_url, _url_details| Err("Error storing URL".to_string()),
-        );
-        mock_url_info
-            .expect_fetch_details()
+        let mut mock_id_generator = MockIdGenerator::new();
+        mock_id_generator
+            .expect_generate_id()
             .times(1)
-            .returning(|_url| {
-                Ok(UrlDetails {
-                    content_type: Some("text/html".to_string()),
-                    title: Some("Google".to_string()),
-                    description: Some("Test description".to_string()),
-                })
-            });
-        let url_shortener = UrlShortener::new(mock_url_repo, mock_url_info);
+            .return_const("12345689".to_string());
+        mock_url_repo
+            .expect_store_short_url()
+            .times(1)
+            .returning(|_url_to_shorten, _short_link| Err("Error storing URL".to_string()));
+        let mut event_publisher = MockEventPublisher::new();
+        event_publisher.expect_publish_link_created().times(0);
+        let deps = HandlerDeps {
+            id_generator: mock_id_generator,
+            url_repo: mock_url_repo,
+            event_publisher,
+        };
         let request = Request::builder()
             .header("Content-Type", "application/json")
             .body(
@@ -147,9 +155,58 @@ mod tests {
             )
             .unwrap();
 
-        let result = function_handler(&url_shortener, request).await;
+        let result = function_handler(&deps, request).await;
 
         let data = result.unwrap().into_response().await;
         assert_eq!(data.status(), 500);
+    }
+
+    #[tokio::test]
+    async fn when_event_publish_fails_should_still_return_200() {
+        let mut mock_url_repo = MockUrlRepository::default();
+        let mut mock_id_generator = MockIdGenerator::new();
+        mock_id_generator
+            .expect_generate_id()
+            .times(1)
+            .return_const("short123".to_string());
+        mock_url_repo
+            .expect_store_short_url()
+            .with(
+                eq("https://example.com".to_string()),
+                eq("short123".to_string()),
+            )
+            .times(1)
+            .returning(|url_to_shorten, short_link| Ok(ShortUrl::new(short_link, url_to_shorten)));
+        let mut event_publisher = MockEventPublisher::new();
+        event_publisher
+            .expect_publish_link_created()
+            .times(1)
+            .returning(|_| {
+                Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "publish failed",
+                )))
+            });
+        let deps = HandlerDeps {
+            id_generator: mock_id_generator,
+            url_repo: mock_url_repo,
+            event_publisher,
+        };
+        let request = Request::builder()
+            .header("Content-Type", "application/json")
+            .body(
+                json!({"url_to_shorten": "https://example.com"})
+                    .to_string()
+                    .into(),
+            )
+            .unwrap();
+
+        let data = function_handler(&deps, request)
+            .await
+            .unwrap()
+            .into_response()
+            .await;
+
+        assert_eq!(data.status(), 200);
     }
 }

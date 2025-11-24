@@ -1,10 +1,14 @@
 use lambda_http::RequestExt;
 use lambda_http::{http::StatusCode, tracing, Error, IntoResponse, Request};
-use shared::core::{UrlInfo, UrlRepository, UrlShortener};
+use shared::core::UrlRepository;
 use shared::utils::{empty_response, json_response};
 
-pub(crate) async fn function_handler<R: UrlRepository, I: UrlInfo>(
-    url_shortener: &UrlShortener<R, I>,
+pub(crate) struct HandlerDeps<R: UrlRepository> {
+    pub url_repo: R,
+}
+
+pub(crate) async fn function_handler<R: UrlRepository>(
+    deps: &HandlerDeps<R>,
     event: Request,
 ) -> Result<impl IntoResponse, Error> {
     tracing::info!("Received event: {:?}", event);
@@ -13,7 +17,7 @@ pub(crate) async fn function_handler<R: UrlRepository, I: UrlInfo>(
         .first("last_evaluated_id")
         .map(|s| s.to_string());
 
-    let links = url_shortener.list_urls(last_evaluated_id).await;
+    let links = deps.url_repo.list_urls(last_evaluated_id).await;
     match links {
         Ok(links) => json_response(&StatusCode::OK, &links),
         Err(e) => {
@@ -25,45 +29,38 @@ pub(crate) async fn function_handler<R: UrlRepository, I: UrlInfo>(
 
 #[cfg(test)]
 mod tests {
-    use crate::function_handler;
+    use super::{function_handler, HandlerDeps};
     use lambda_http::http::Request;
-    use lambda_http::Body;
-    use lambda_http::IntoResponse;
-    use lambda_http::RequestExt;
-    use mockall::predicate;
-    use shared::core::MockUrlInfo;
-    use shared::core::MockUrlRepository;
-    use shared::core::ShortUrl;
-    use shared::core::UrlShortener;
+    use lambda_http::{Body, IntoResponse, RequestExt};
+    use mockall::predicate::eq;
+    use shared::core::{MockUrlRepository, ShortUrl};
     use std::collections::HashMap;
 
     #[tokio::test]
     async fn when_valid_request_made_should_return() {
         let mut mock_url_repo = MockUrlRepository::default();
-        let mock_url_info = MockUrlInfo::default();
         mock_url_repo
             .expect_list_urls()
             .times(1)
+            .with(eq(None))
             .returning(|_last_evaluated_id| {
                 Ok((
                     vec![ShortUrl::new(
-                        "12345689".to_string(),
-                        "https://google.com".to_string(),
-                        0,
-                        None,
-                        None,
-                        None,
+                        "12345689".into(),
+                        "https://google.com".into(),
                     )],
                     None,
                 ))
             });
-        let url_shortener = UrlShortener::new(mock_url_repo, mock_url_info);
+        let deps = HandlerDeps {
+            url_repo: mock_url_repo,
+        };
         let request = Request::builder()
             .header("Content-Type", "application/json")
             .body(Body::Empty)
             .unwrap();
 
-        let result = function_handler(&url_shortener, request).await;
+        let result = function_handler(&deps, request).await;
 
         assert!(result.is_ok());
         let data = result.unwrap().into_response().await;
@@ -73,25 +70,22 @@ mod tests {
     #[tokio::test]
     async fn when_valid_request_made_with_path_parameter_should_return() {
         let mut mock_url_repo = MockUrlRepository::default();
-        let mock_url_info = MockUrlInfo::default();
         mock_url_repo
             .expect_list_urls()
             .times(1)
-            .with(predicate::eq(Some("an-id".to_string()))) // make sure the correct id is propagated
+            .with(eq(Some("an-id".to_string()))) // make sure the correct id is propagated
             .returning(|_last_evaluated_id| {
                 Ok((
                     vec![ShortUrl::new(
-                        "12345689".to_string(),
-                        "https://google.com".to_string(),
-                        0,
-                        None,
-                        None,
-                        None,
+                        "12345689".into(),
+                        "https://google.com".into(),
                     )],
                     None,
                 ))
             });
-        let url_shortener = UrlShortener::new(mock_url_repo, mock_url_info);
+        let deps = HandlerDeps {
+            url_repo: mock_url_repo,
+        };
         let mut query_string = HashMap::new();
         query_string.insert("last_evaluated_id".to_string(), "an-id".to_string());
         let request = Request::builder()
@@ -100,7 +94,7 @@ mod tests {
             .unwrap()
             .with_query_string_parameters(query_string);
 
-        let result = function_handler(&url_shortener, request).await;
+        let result = function_handler(&deps, request).await;
 
         assert!(result.is_ok());
         let data = result.unwrap().into_response().await;
@@ -110,12 +104,13 @@ mod tests {
     #[tokio::test]
     async fn when_error_in_database_return_500() {
         let mut mock_url_repo = MockUrlRepository::default();
-        let mock_url_info = MockUrlInfo::default();
         mock_url_repo
             .expect_list_urls()
             .times(1)
             .returning(|_last_evaluated_id| Err("Error reading from DB".to_string()));
-        let url_shortener = UrlShortener::new(mock_url_repo, mock_url_info);
+        let deps = HandlerDeps {
+            url_repo: mock_url_repo,
+        };
         let mut query_string = HashMap::new();
         query_string.insert("last_evaluated_id".to_string(), "an-id".to_string());
         let request = Request::builder()
@@ -124,7 +119,7 @@ mod tests {
             .unwrap()
             .with_query_string_parameters(query_string);
 
-        let result = function_handler(&url_shortener, request).await;
+        let result = function_handler(&deps, request).await;
 
         assert!(result.is_ok());
         let data = result.unwrap().into_response().await;

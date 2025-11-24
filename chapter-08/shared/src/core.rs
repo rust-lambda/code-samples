@@ -10,7 +10,7 @@ use mockall::{automock, predicate::*};
 #[cfg_attr(any(test, feature = "mocks"), automock)]
 #[async_trait]
 pub trait UrlRepository: Debug {
-    async fn get_url_from_short_link(&self, short_link: &str) -> Result<Option<String>, String>;
+    async fn get_url_from_short_link(&self, short_link: &str) -> Result<Option<ShortUrl>, String>;
     async fn store_short_url(
         &self,
         url_to_shorten: String,

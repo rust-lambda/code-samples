@@ -3,10 +3,7 @@ use crate::{
     url_info::UrlDetails,
 };
 use async_trait::async_trait;
-use aws_sdk_dynamodb::{
-    types::{AttributeValue, ReturnValue},
-    Client,
-};
+use aws_sdk_dynamodb::{types::AttributeValue, Client};
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -26,37 +23,22 @@ impl DynamoDbUrlRepository {
 
 #[async_trait]
 impl UrlRepository for DynamoDbUrlRepository {
-    async fn get_url_from_short_link(&self, short_link: &str) -> Result<Option<String>, String> {
+    async fn get_url_from_short_link(&self, short_link: &str) -> Result<Option<ShortUrl>, String> {
         let result = self
             .dynamodb_client
-            .update_item()
+            .get_item()
             .table_name(&self.table_name)
             .key("LinkId", AttributeValue::S(short_link.to_string()))
-            .update_expression("SET Clicks = Clicks + :val")
-            .expression_attribute_values(":val", AttributeValue::N("1".to_string()))
-            .condition_expression("attribute_exists(LinkId)")
-            .return_values(ReturnValue::AllNew)
             .send()
             .await
-            .map(|record| {
-                record.attributes.and_then(|attributes| {
-                    attributes
-                        .get("OriginalLink")
-                        .and_then(|v| v.as_s().cloned().ok())
-                })
-            });
+            .map_err(|e| format!("Error getting item: {:?}", e))?;
 
-        match result {
-            Err(e) => {
-                let generic_err_msg = format!("Error incrementing clicks: {:?}", e);
-                let service_error = e.into_service_error();
-                if service_error.is_conditional_check_failed_exception() {
-                    Ok(None)
-                } else {
-                    Err(generic_err_msg)
-                }
+        match result.item {
+            Some(item) => {
+                let short_url = ShortUrl::try_from(item)?;
+                Ok(Some(short_url))
             }
-            Ok(result) => Ok(result),
+            None => Ok(None),
         }
     }
 

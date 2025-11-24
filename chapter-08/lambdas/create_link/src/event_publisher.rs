@@ -3,6 +3,10 @@ use aws_sdk_sqs::operation::send_message::SendMessageError;
 use shared::core::ShortUrl;
 use std::fmt::Display;
 
+#[cfg(test)]
+use mockall::automock;
+
+#[cfg_attr(test, automock)]
 pub(crate) trait EventPublisher {
     async fn publish_link_created(
         &self,
