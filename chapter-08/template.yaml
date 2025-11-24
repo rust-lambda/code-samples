@@ -55,10 +55,6 @@ Resources:
       Policies:
         - DynamoDBWritePolicy:
             TableName: !Ref LinksTable
-        - SSMParameterReadPolicy:
-            ParameterName: !Sub ${Env}/url-shortener/config
-        - AWSSecretsManagerGetSecretValuePolicy:
-            SecretArn: !Ref ApplicationSecret
 
   GetLinksFunction:
     Metadata:
@@ -80,10 +76,6 @@ Resources:
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref LinksTable
-        - SSMParameterReadPolicy:
-            ParameterName: !Sub ${Env}/url-shortener/config
-        - AWSSecretsManagerGetSecretValuePolicy:
-            SecretArn: !Ref ApplicationSecret
 
   LinksTable:
     DeletionPolicy: Retain
