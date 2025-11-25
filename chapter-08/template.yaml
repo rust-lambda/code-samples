@@ -111,6 +111,7 @@ Resources:
       Runtime: provided.al2023
       Architectures:
         - arm64
+      Timeout: 120
       Environment:
         Variables:
           TABLE_NAME: !Ref LinksTable
@@ -140,6 +141,7 @@ Resources:
       Runtime: provided.al2023
       Architectures:
         - arm64
+      Timeout: 120
       Environment:
         Variables:
           TABLE_NAME: !Ref LinksTable
