@@ -65,7 +65,7 @@ async fn process_message<R: UrlRepository, I: UrlInfo>(
         info
     );
     url_repo
-        .add_details_to_short_url(short_url.original_link, info)
+        .add_details_to_short_url(short_url.link_id, info)
         .await?;
     Ok(())
 }

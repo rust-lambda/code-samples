@@ -100,6 +100,35 @@ Resources:
         - DynamoDBReadPolicy:
             TableName: !Ref LinksTable
 
+  ProcessLinkCreatedFunction:
+    Metadata:
+      BuildMethod: rust-cargolambda
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./lambdas/process_link_created
+      Handler: bootstrap
+      FunctionName: !Sub ProcessLinkCreatedFunction-${Env}
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref LinksTable
+      Events:
+        LinkCreatedEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt LinkCreatedQueue.Arn
+            BatchSize: 20
+            MaximumBatchingWindowInSeconds: 10
+            ScalingConfig: 
+              MaximumConcurrency: 4
+            FunctionResponseTypes: 
+              - ReportBatchItemFailures
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref LinksTable
+
   LinksTable:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain

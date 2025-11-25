@@ -74,21 +74,36 @@ impl UrlRepository for DynamoDbUrlRepository {
             .table_name(&self.table_name)
             .key("LinkId", AttributeValue::S(short_link.to_string()));
 
-        if let Some(title) = url_details.title {
-            update_item = update_item
-                .update_expression("SET Title = :title")
-                .expression_attribute_values(":title", AttributeValue::S(title));
+        let mut set_clauses: Vec<&str> = Vec::new();
+
+        if let Some(ref title) = url_details.title {
+            set_clauses.push("Title = :title");
+            update_item =
+                update_item.expression_attribute_values(":title", AttributeValue::S(title.clone()));
         }
-        if let Some(description) = url_details.description {
-            update_item = update_item
-                .update_expression("SET Description = :description")
-                .expression_attribute_values(":description", AttributeValue::S(description));
+        if let Some(ref description) = url_details.description {
+            set_clauses.push("Description = :description");
+            update_item = update_item.expression_attribute_values(
+                ":description",
+                AttributeValue::S(description.clone()),
+            );
         }
-        if let Some(content_type) = url_details.content_type {
-            update_item = update_item
-                .update_expression("SET ContentType = :content_type")
-                .expression_attribute_values(":content_type", AttributeValue::S(content_type));
+        if let Some(ref content_type) = url_details.content_type {
+            set_clauses.push("ContentType = :content_type");
+            update_item = update_item.expression_attribute_values(
+                ":content_type",
+                AttributeValue::S(content_type.clone()),
+            );
         }
+
+        if set_clauses.is_empty() {
+            return Ok(());
+        }
+
+        let update_expression = format!("SET {}", set_clauses.join(", "));
+        update_item = update_item
+            .update_expression(update_expression)
+            .condition_expression("attribute_exists(LinkId)");
 
         update_item
             .send()
