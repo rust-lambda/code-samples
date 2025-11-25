@@ -37,7 +37,7 @@ pub(crate) async fn function_handler<R: UrlRepository, E: EventPublisher>(
             if let Err(e) = &publish_result {
                 tracing::warn!("Failed to publish link clicked event: {:?}", e);
             }
-            return redirect_response(&short_url.original_link);
+            redirect_response(&short_url.original_link)
         }
     }
 }

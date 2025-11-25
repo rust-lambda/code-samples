@@ -24,7 +24,7 @@ pub(crate) async fn function_handler<R: UrlRepository>(
         let link_click_event: Result<ShortUrl, _> = serde_json::from_slice(data);
         match link_click_event {
             Err(e) => {
-                tracing::warn!("Failed to deserialize shortUrl: {:?}", e);
+                tracing::warn!("Failed to deserialize short_url: {:?}", e);
                 continue;
             }
             Ok(short_url) => {
