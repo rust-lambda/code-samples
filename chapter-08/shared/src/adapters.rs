@@ -112,13 +112,15 @@ impl UrlRepository for DynamoDbUrlRepository {
             .map_err(|e| format!("Error updating item: {:?}", e))
     }
 
-    async fn increment_clicks(&self, short_link: &str, n: u32) -> Result<(), String> {
+    async fn increment_clicks(&self, short_link: &str, n: u64) -> Result<(), String> {
         self.dynamodb_client
             .update_item()
             .table_name(&self.table_name)
             .key("LinkId", AttributeValue::S(short_link.to_string()))
-            .update_expression("SET Clicks = Clicks + :val")
+            .update_expression("SET Clicks = if_not_exists(Clicks, :zero) + :val")
             .expression_attribute_values(":val", AttributeValue::N(n.to_string()))
+            .expression_attribute_values(":zero", AttributeValue::N("0".to_string()))
+            .condition_expression("attribute_exists(LinkId)")
             .send()
             .await
             .map(|_| ())

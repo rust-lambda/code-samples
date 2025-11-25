@@ -6,5 +6,6 @@ members = [
   "lambdas/get_links",
   "lambdas/visit_link",
   "lambdas/process_link_created",
+  "lambdas/process_link_clicked",
   "integration-tests",
 ]

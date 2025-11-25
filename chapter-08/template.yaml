@@ -129,6 +129,34 @@ Resources:
         - DynamoDBWritePolicy:
             TableName: !Ref LinksTable
 
+  ProcessLinkClickedFunction:
+    Metadata:
+      BuildMethod: rust-cargolambda
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./lambdas/process_link_clicked
+      Handler: bootstrap
+      FunctionName: !Sub ProcessLinkClickedFunction-${Env}
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref LinksTable
+      Events:
+        LinkClickedEvent:
+          Type: Kinesis
+          Properties:
+            Stream: !GetAtt LinkClickedStream.Arn
+            BatchSize: 10000
+            MaximumBatchingWindowInSeconds: 300
+            StartingPosition: TRIM_HORIZON
+            MaximumRetryAttempts: 2
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref LinksTable
+
+
   LinksTable:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain

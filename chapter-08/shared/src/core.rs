@@ -21,7 +21,7 @@ pub trait UrlRepository: Debug {
         short_link: String,
         url_details: UrlDetails,
     ) -> Result<(), String>;
-    async fn increment_clicks(&self, short_link: &str, n: u32) -> Result<(), String>;
+    async fn increment_clicks(&self, short_link: &str, n: u64) -> Result<(), String>;
     async fn list_urls(
         &self,
         last_evaluated_id: Option<String>,
