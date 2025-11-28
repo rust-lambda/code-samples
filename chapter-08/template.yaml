@@ -215,6 +215,11 @@ Outputs:
     Value: !Ref LinkCreatedQueue
     Export: 
       Name: !Sub LinkCreatedQueueUrl-${Env}
+  LinkClickedStreamName:
+    Description: "LinkClickedStream name"
+    Value: !Ref LinkClickedStream
+    Export:
+      Name: !Sub LinkClickedStreamName-${Env}
   UrlShortenerEndpoint:
     Description: "API endpoint"
     Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/"
