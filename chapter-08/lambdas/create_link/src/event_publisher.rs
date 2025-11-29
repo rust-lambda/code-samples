@@ -2,19 +2,19 @@ use aws_sdk_eventbridge::{operation::put_events::PutEventsError, types::PutEvent
 use aws_sdk_sqs::operation::send_message::SendMessageError;
 use shared::core::ShortUrl;
 use std::fmt::Display;
+use thiserror::Error;
 
 #[cfg(test)]
 use mockall::automock;
 
+type Error = Box<dyn std::error::Error + Send + Sync>;
+
 #[cfg_attr(test, automock)]
 pub(crate) trait EventPublisher {
-    async fn publish_link_created(
-        &self,
-        short_url: &ShortUrl,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
+    async fn publish_link_created(&self, short_url: &ShortUrl) -> Result<(), Error>;
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Error)]
 struct SqsEventBridgePublisherError {
     sqs_error: Option<SendMessageError>,
     eventbridge_error: Option<PutEventsError>,
@@ -54,17 +54,14 @@ impl SqsEventBridgePublisher {
 }
 
 impl EventPublisher for SqsEventBridgePublisher {
-    async fn publish_link_created(
-        &self,
-        short_url: &ShortUrl,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let message_body = serde_json::to_string(short_url)?;
+    async fn publish_link_created(&self, short_url: &ShortUrl) -> Result<(), Error> {
+        let message_body = serde_json::to_string(short_url).expect("Failed to serialize ShortUrl");
 
         let send_to_queue = self
             .sqs_client
             .send_message()
             .queue_url(&self.queue_url)
-            .message_body(message_body)
+            .message_body(message_body.clone())
             .send();
 
         let send_event = self
@@ -74,7 +71,7 @@ impl EventPublisher for SqsEventBridgePublisher {
                 PutEventsRequestEntry::builder()
                     .source("link_shortener")
                     .detail_type("LinkCreated")
-                    .detail(serde_json::to_string(short_url)?)
+                    .detail(message_body.clone())
                     .build(),
             )
             .send();

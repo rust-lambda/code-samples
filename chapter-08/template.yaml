@@ -75,6 +75,8 @@ Resources:
             TableName: !Ref LinksTable
         - SQSSendMessagePolicy:
             QueueName: !GetAtt LinkCreatedQueue.QueueName
+        - EventBridgePutEventsPolicy:
+            EventBusName: default
 
   GetLinksFunction:
     Metadata:
