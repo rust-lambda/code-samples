@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-
 use aws_lambda_events::event::kinesis::KinesisEvent;
 use lambda_runtime::{tracing, Error, LambdaEvent};
 use shared::core::{ShortUrl, UrlRepository};
+use std::collections::HashMap;
 
 pub(crate) struct HandlerDeps<R: UrlRepository> {
     pub url_repo: R,

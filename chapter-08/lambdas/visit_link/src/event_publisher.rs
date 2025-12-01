@@ -2,12 +2,11 @@
 use mockall::automock;
 use shared::core::ShortUrl;
 
+type Error = Box<dyn std::error::Error + Send + Sync>;
+
 #[cfg_attr(test, automock)]
 pub(crate) trait EventPublisher {
-    async fn publish_link_clicked(
-        &self,
-        short_url: &ShortUrl,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
+    async fn publish_link_clicked(&self, short_url: &ShortUrl) -> Result<(), Error>;
 }
 
 pub(crate) struct KinesisEventPublisher {
@@ -25,10 +24,7 @@ impl KinesisEventPublisher {
 }
 
 impl EventPublisher for KinesisEventPublisher {
-    async fn publish_link_clicked(
-        &self,
-        short_url: &ShortUrl,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn publish_link_clicked(&self, short_url: &ShortUrl) -> Result<(), Error> {
         let data = serde_json::to_vec(short_url)?;
 
         self.kinesis_client
