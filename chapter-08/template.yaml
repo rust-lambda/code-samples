@@ -162,8 +162,8 @@ Resources:
 
 
   LinksTable:
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: !Sub LinksTable-${Env}
@@ -179,27 +179,28 @@ Resources:
   
   LinkCreatedQueue:
     Type: AWS::SQS::Queue
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       QueueName: !Sub LinkCreatedQueue-${Env}
       MessageRetentionPeriod: 86400 # 1 day
+      VisibilityTimeout: 730 # ~12 minutes
       RedrivePolicy: 
         deadLetterTargetArn: !GetAtt LinkCreatedDLQ.Arn
         maxReceiveCount: 3
 
   LinkCreatedDLQ:
     Type: AWS::SQS::Queue
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       QueueName: !Sub LinkCreatedDLQ-${Env}
       MessageRetentionPeriod: 1209600 # 14 days
 
   LinkClickedStream:
     Type: AWS::Kinesis::Stream
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Properties:
       Name: !Sub LinkClickedStream-${Env}
       StreamModeDetails:
