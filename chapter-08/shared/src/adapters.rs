@@ -1,65 +1,44 @@
 use crate::{
-    configuration::Configuration,
     core::{ShortUrl, UrlRepository},
+    url_info::UrlDetails,
 };
 use async_trait::async_trait;
-use aws_sdk_dynamodb::{
-    types::{AttributeValue, ReturnValue},
-    Client,
-};
+use aws_sdk_dynamodb::{types::AttributeValue, Client};
 use std::collections::HashMap;
 
 #[derive(Debug)]
-pub struct DynamoDbUrlRepository<'a> {
-    configuration: &'a Configuration,
+pub struct DynamoDbUrlRepository {
+    table_name: String,
     dynamodb_client: Client,
 }
 
-impl<'a> DynamoDbUrlRepository<'a> {
-    pub fn new(configuration: &'a Configuration, dynamodb_client: Client) -> Self {
+impl DynamoDbUrlRepository {
+    pub fn new(table_name: String, dynamodb_client: Client) -> Self {
         Self {
+            table_name,
             dynamodb_client,
-            configuration,
         }
     }
 }
 
 #[async_trait]
-impl<'a> UrlRepository for DynamoDbUrlRepository<'a> {
-    async fn get_url_from_short_link(
-        &self,
-        short_link: &str,
-    ) -> Result<Option<String>, String> {
+impl UrlRepository for DynamoDbUrlRepository {
+    async fn get_url_from_short_link(&self, short_link: &str) -> Result<Option<ShortUrl>, String> {
         let result = self
             .dynamodb_client
-            .update_item()
-            .table_name(&self.configuration.table_name)
+            .get_item()
+            .table_name(&self.table_name)
             .key("LinkId", AttributeValue::S(short_link.to_string()))
-            .update_expression("SET Clicks = Clicks + :val")
-            .expression_attribute_values(":val", AttributeValue::N("1".to_string()))
-            .condition_expression("attribute_exists(LinkId)")
-            .return_values(ReturnValue::AllNew)
             .send()
             .await
-            .map(|record| {
-                record.attributes.and_then(|attributes| {
-                    attributes
-                        .get("OriginalLink")
-                        .and_then(|v| v.as_s().cloned().ok())
-                })
-            });
+            .map_err(|e| format!("Error getting item: {:?}", e))?;
 
-        match result {
-            Err(e) => {
-                let generic_err_msg = format!("Error incrementing clicks: {:?}", e);
-                let service_error = e.into_service_error();
-                if service_error.is_conditional_check_failed_exception() {
-                    Ok(None)
-                } else {
-                    Err(generic_err_msg)
-                }
+        match result.item {
+            Some(item) => {
+                let short_url = ShortUrl::try_from(item)?;
+                Ok(Some(short_url))
             }
-            Ok(result) => Ok(result),
+            None => Ok(None),
         }
     }
 
@@ -67,41 +46,85 @@ impl<'a> UrlRepository for DynamoDbUrlRepository<'a> {
         &self,
         url_to_shorten: String,
         short_url: String,
-        url_details: crate::url_info::UrlDetails,
     ) -> Result<ShortUrl, String> {
-        let mut put_item = self
+        let put_item = self
             .dynamodb_client
             .put_item()
-            .table_name(&self.configuration.table_name)
+            .table_name(&self.table_name)
             .item("LinkId", AttributeValue::S(short_url.clone()))
             .item("OriginalLink", AttributeValue::S(url_to_shorten.clone()))
             .item("Clicks", AttributeValue::N("0".to_string()));
-
-        if let Some(ref title) = url_details.title {
-            put_item = put_item.item("Title", AttributeValue::S(title.to_string()));
-        }
-        if let Some(ref description) = url_details.description {
-            put_item = put_item.item("Description", AttributeValue::S(description.to_string()));
-        }
-        if let Some(ref content_type) = url_details.content_type {
-            put_item = put_item.item("ContentType", AttributeValue::S(content_type.to_string()));
-        }
 
         put_item
             .condition_expression("attribute_not_exists(LinkId)")
             .send()
             .await
-            .map(|_| {
-                ShortUrl::new(
-                    short_url,
-                    url_to_shorten,
-                    0,
-                    url_details.title,
-                    url_details.description,
-                    url_details.content_type,
-                )
-            })
+            .map(|_| ShortUrl::new(short_url, url_to_shorten))
             .map_err(|e| format!("Error adding item: {:?}", e))
+    }
+
+    async fn add_details_to_short_url(
+        &self,
+        short_link: String,
+        url_details: UrlDetails,
+    ) -> Result<(), String> {
+        let mut update_item = self
+            .dynamodb_client
+            .update_item()
+            .table_name(&self.table_name)
+            .key("LinkId", AttributeValue::S(short_link.to_string()));
+
+        let mut set_clauses: Vec<&str> = Vec::new();
+
+        if let Some(ref title) = url_details.title {
+            set_clauses.push("Title = :title");
+            update_item =
+                update_item.expression_attribute_values(":title", AttributeValue::S(title.clone()));
+        }
+        if let Some(ref description) = url_details.description {
+            set_clauses.push("Description = :description");
+            update_item = update_item.expression_attribute_values(
+                ":description",
+                AttributeValue::S(description.clone()),
+            );
+        }
+        if let Some(ref content_type) = url_details.content_type {
+            set_clauses.push("ContentType = :content_type");
+            update_item = update_item.expression_attribute_values(
+                ":content_type",
+                AttributeValue::S(content_type.clone()),
+            );
+        }
+
+        if set_clauses.is_empty() {
+            return Ok(());
+        }
+
+        let update_expression = format!("SET {}", set_clauses.join(", "));
+        update_item = update_item
+            .update_expression(update_expression)
+            .condition_expression("attribute_exists(LinkId)");
+
+        update_item
+            .send()
+            .await
+            .map(|_| ())
+            .map_err(|e| format!("Error updating item: {:?}", e))
+    }
+
+    async fn increment_clicks(&self, short_link: &str, n: u64) -> Result<(), String> {
+        self.dynamodb_client
+            .update_item()
+            .table_name(&self.table_name)
+            .key("LinkId", AttributeValue::S(short_link.to_string()))
+            .update_expression("SET Clicks = if_not_exists(Clicks, :zero) + :val")
+            .expression_attribute_values(":val", AttributeValue::N(n.to_string()))
+            .expression_attribute_values(":zero", AttributeValue::N("0".to_string()))
+            .condition_expression("attribute_exists(LinkId)")
+            .send()
+            .await
+            .map(|_| ())
+            .map_err(|e| format!("Error incrementing clicks: {:?}", e))
     }
 
     async fn list_urls(
@@ -111,7 +134,7 @@ impl<'a> UrlRepository for DynamoDbUrlRepository<'a> {
         let mut scan = self
             .dynamodb_client
             .scan()
-            .table_name(&self.configuration.table_name)
+            .table_name(&self.table_name)
             .limit(50);
         if let Some(last_evaluated_id) = last_evaluated_id {
             scan = scan
@@ -176,7 +199,7 @@ impl TryFrom<HashMap<String, AttributeValue>> for ShortUrl {
             .get("Description")
             .and_then(|c| c.as_s().map(|s| s.to_string()).ok());
 
-        Ok(ShortUrl::new(
+        Ok(ShortUrl::with_details(
             link_id,
             original_link,
             clicks,

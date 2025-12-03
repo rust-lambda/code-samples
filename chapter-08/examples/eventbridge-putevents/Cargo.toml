@@ -1,0 +1,11 @@
+[package]
+name = "eventbridge-putevents"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.38", features = ["macros", "rt-multi-thread"] }
+aws-config = { version = "1.1", features = ["behavior-version-latest"] }
+aws-sdk-eventbridge = "1.97.0"
+serde_json = "1.0"
+serde = "1.0.228"

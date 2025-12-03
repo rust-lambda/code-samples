@@ -12,25 +12,8 @@ Globals:
     Environment:
       Variables:
         APP_TABLE_NAME: !Ref LinksTable
-        CONFIGURATION_PARAMETER_NAME: !Ref ApplicationConfiguration
-        SECRET_MANAGER_SECRET_ID: !GetAtt ApplicationSecret.Id
 
-Resources:
-  # Creating parameters and secrets should generally be done in a separate stack, this is for demonstration purposes only.
-  ApplicationConfiguration:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: !Sub /${Env}/url-shortener/config
-      Type: String
-      Value: "{\"log_level\": \"INFO\"}"
-  
-  ApplicationSecret:
-    Type: 'AWS::SecretsManager::Secret'
-    Properties:
-      Name: ApiKeySecret
-      Description: This secret includes the API key for the application
-      SecretString: '{"api_key":"This is a random API key"}'
-
+Resources:  
   VisitLinkFunction:
     Metadata:
       BuildMethod: rust-cargolambda
@@ -42,6 +25,10 @@ Resources:
       Runtime: provided.al2023
       Architectures:
         - arm64
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref LinksTable
+          STREAM_NAME: !Ref LinkClickedStream
       Events:
         GetLinks:
           Type: HttpApi
@@ -49,12 +36,18 @@ Resources:
             Path: /{linkId}
             Method: GET
       Policies:
-        - DynamoDBCrudPolicy:
+        - DynamoDBReadPolicy:
             TableName: !Ref LinksTable
-        - SSMParameterReadPolicy:
-            ParameterName: !Sub ${Env}/url-shortener/config
-        - AWSSecretsManagerGetSecretValuePolicy:
-            SecretArn: !Ref ApplicationSecret
+        # NOTE: No SAM policy template for Kinesis PutRecords (Write only)
+        #   so we define it inline here
+        - Statement:
+            Sid: KinesisPutRecordsPolicy
+            Effect: Allow
+            Action: 
+              - kinesis:PutRecord
+              - kinesis:PutRecords
+            Resource:
+              - !GetAtt LinkClickedStream.Arn
 
   CreateLinkFunction:
     Metadata:
@@ -67,6 +60,10 @@ Resources:
       Runtime: provided.al2023
       Architectures:
         - arm64
+      Environment:
+        Variables:
+          QUEUE_URL: !Ref LinkCreatedQueue
+          TABLE_NAME: !Ref LinksTable
       Events:
         CreateLink:
           Type: HttpApi
@@ -76,10 +73,10 @@ Resources:
       Policies:
         - DynamoDBWritePolicy:
             TableName: !Ref LinksTable
-        - SSMParameterReadPolicy:
-            ParameterName: !Sub ${Env}/url-shortener/config
-        - AWSSecretsManagerGetSecretValuePolicy:
-            SecretArn: !Ref ApplicationSecret
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt LinkCreatedQueue.QueueName
+        - EventBridgePutEventsPolicy:
+            EventBusName: default
 
   GetLinksFunction:
     Metadata:
@@ -92,6 +89,9 @@ Resources:
       Runtime: provided.al2023
       Architectures:
         - arm64
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref LinksTable
       Events:
         GetLinks:
           Type: HttpApi
@@ -101,17 +101,74 @@ Resources:
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref LinksTable
-        - SSMParameterReadPolicy:
-            ParameterName: !Sub ${Env}/url-shortener/config
-        - AWSSecretsManagerGetSecretValuePolicy:
-            SecretArn: !Ref ApplicationSecret
+
+  ProcessLinkCreatedFunction:
+    Metadata:
+      BuildMethod: rust-cargolambda
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./lambdas/process_link_created
+      Handler: bootstrap
+      FunctionName: !Sub ProcessLinkCreatedFunction-${Env}
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      Timeout: 120
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref LinksTable
+      Events:
+        LinkCreatedEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt LinkCreatedQueue.Arn
+            BatchSize: 20
+            MaximumBatchingWindowInSeconds: 10
+            ScalingConfig: 
+              MaximumConcurrency: 4
+            FunctionResponseTypes: 
+              - ReportBatchItemFailures
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref LinksTable
+
+  ProcessLinkClickedFunction:
+    Metadata:
+      BuildMethod: rust-cargolambda
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./lambdas/process_link_clicked
+      Handler: bootstrap
+      FunctionName: !Sub ProcessLinkClickedFunction-${Env}
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      Timeout: 120
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref LinksTable
+      Events:
+        LinkClickedEvent:
+          Type: Kinesis
+          Properties:
+            Stream: !GetAtt LinkClickedStream.Arn
+            BatchSize: 10000
+            MaximumBatchingWindowInSeconds: 300
+            StartingPosition: TRIM_HORIZON
+            MaximumRetryAttempts: 2
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref LinksTable
+
 
   LinksTable:
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: !Sub LinksTable-${Env}
+      SSESpecification:
+        SSEEnabled: true
       KeySchema:
         - AttributeName: LinkId
           KeyType: HASH
@@ -119,13 +176,53 @@ Resources:
         - AttributeName: LinkId
           AttributeType: S
       BillingMode: PAY_PER_REQUEST
+  
+  LinkCreatedQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      QueueName: !Sub LinkCreatedQueue-${Env}
+      MessageRetentionPeriod: 86400 # 1 day
+      VisibilityTimeout: 730 # ~12 minutes
+      RedrivePolicy: 
+        deadLetterTargetArn: !GetAtt LinkCreatedDLQ.Arn
+        maxReceiveCount: 3
+
+  LinkCreatedDLQ:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      QueueName: !Sub LinkCreatedDLQ-${Env}
+      MessageRetentionPeriod: 1209600 # 14 days
+
+  LinkClickedStream:
+    Type: AWS::Kinesis::Stream
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Name: !Sub LinkClickedStream-${Env}
+      StreamModeDetails:
+        StreamMode: ON_DEMAND
+      RetentionPeriodHours: 24
 
 Outputs:
   LinksTableName:
     Description: "LinksTable name"
+    Value: !Ref LinksTable
     Export:
       Name: !Sub LinksTableName-${Env}
-    Value: !Ref LinksTable
+  LinkCreatedQueueUrl:
+    Description: "LinkCreatedQueue URL"
+    Value: !Ref LinkCreatedQueue
+    Export: 
+      Name: !Sub LinkCreatedQueueUrl-${Env}
+  LinkClickedStreamName:
+    Description: "LinkClickedStream name"
+    Value: !Ref LinkClickedStream
+    Export:
+      Name: !Sub LinkClickedStreamName-${Env}
   UrlShortenerEndpoint:
     Description: "API endpoint"
     Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/"

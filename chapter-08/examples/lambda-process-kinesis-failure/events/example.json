@@ -1,0 +1,52 @@
+{
+  "Records": [
+    {
+      "kinesis": {
+        "kinesisSchemaVersion": "1.0",
+        "partitionKey": "s1",
+        "sequenceNumber": "49568167373333333333333333333333333333333333333333333333",
+        "data": "ewogICJvcmRlcl9pZCI6ICJvcmRlci0xIiwKICAiY3VzdG9tZXJfaWQiOiAiY3VzdG9tZXItMSIsCiAgImFtb3VudCI6IDExLjExCn0=",
+        "approximateArrivalTimestamp": 1480641523.477
+      },
+      "eventSource": "aws:kinesis",
+      "eventVersion": "1.0",
+      "eventID": "shardId-000000000000:49568167373333333333333333333333333333333333333333333333",
+      "eventName": "aws:kinesis:record",
+      "invokeIdentityArn": "arn:aws:iam::123456789012:role/LambdaRole",
+      "awsRegion": "us-east-1",
+      "eventSourceARN": "arn:aws:kinesis:us-east-1:123456789012:stream/simple-stream"
+    },
+    {
+      "kinesis": {
+        "kinesisSchemaVersion": "1.0",
+        "partitionKey": "s1",
+        "sequenceNumber": "49568167373333333334444444444444444444444444444444444444",
+        "data": "ewogICJvcmRlcl9pZCI6ICJvcmRlci0yIiwKICAiY3VzdG9tZXJfaWQiOiAiY3VzdG9tZXItMiIsCiAgImFtb3VudCI6IDIyLjIyCn0=",
+        "approximateArrivalTimestamp": 1480841523.477
+      },
+      "eventSource": "aws:kinesis",
+      "eventVersion": "1.0",
+      "eventID": "shardId-000000000000:49568167373333333334444444444444444444444444444444444444",
+      "eventName": "aws:kinesis:record",
+      "invokeIdentityArn": "arn:aws:iam::123456789012:role/LambdaRole",
+      "awsRegion": "us-east-1",
+      "eventSourceARN": "arn:aws:kinesis:us-east-1:123456789012:stream/simple-stream"
+    },
+    {
+      "kinesis": {
+        "kinesisSchemaVersion": "1.0",
+        "partitionKey": "s1",
+        "sequenceNumber": "49568167373333333334444444444444444444444444444444444445",
+        "data": "ewogICJvcmRlcl9pZCI6ICJvcmRlci0zIiwKICAiY3VzdG9tZXJfaWQiOiAiY3VzdG9tZXItMyIsCiAgImFtb3VudCI6IDMzLjMzCn0=",
+        "approximateArrivalTimestamp": 1480841527.477
+      },
+      "eventSource": "aws:kinesis",
+      "eventVersion": "1.0",
+      "eventID": "shardId-000000000000:49568167373333333334444444444444444444444444444444444444",
+      "eventName": "aws:kinesis:record",
+      "invokeIdentityArn": "arn:aws:iam::123456789012:role/LambdaRole",
+      "awsRegion": "us-east-1",
+      "eventSourceARN": "arn:aws:kinesis:us-east-1:123456789012:stream/simple-stream"
+    }
+  ]
+}
