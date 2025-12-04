@@ -1,0 +1,29 @@
+[package]
+name = "shared"
+version = "0.1.0"
+edition = "2021"
+resolver = "2"
+
+[features]
+mocks = ["dep:mockall"]
+
+[dependencies]
+scraper = "0.23.1"
+cuid2 = "0.1"
+serde = "1.0"
+serde_json = "1.0"
+aws-sdk-dynamodb = "1.31"
+aws-sdk-ssm = "1.31"
+aws-sdk-secretsmanager = "1.66.0"
+reqwest = { version = "0.12", default-features = false, features = [
+  "rustls-tls",
+  "http2",
+] }
+lambda_http = "0.14"
+async-trait = "0.1.81"
+mockall = { version = "0.13", optional = true }
+figment = { version = "0.10.19", features = ["env", "json", "test"] }
+
+[dev-dependencies]
+mockall = "0.13"
+tokio = { version = "1.38", features = ["macros", "rt-multi-thread"] }
