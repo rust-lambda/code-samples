@@ -72,7 +72,7 @@ pub(crate) async fn function_handler<R: UrlRepository>(
     Ok(())
 }
 
-#[tracing::instrument("process link_clicked.v1" skip(record), fields(
+#[tracing::instrument("process link_clicked.v1", skip(record), fields(
     messaging.message.id = tracing::field::Empty,
     messaging.operation.name = "process",
     messaging.destination = "aws_kinesis",

@@ -11,8 +11,8 @@ pub fn get_traceparent_extension_value(span: &tracing::Span) -> String {
     let otel_span = binding.span();
     let span_context = otel_span.span_context();
 
-    let trace_id = span_context.trace_id().to_string().clone();
-    let span_id = span_context.span_id().to_string().clone();
+    let trace_id = span_context.trace_id().to_string();
+    let span_id = span_context.span_id().to_string();
     let trace_flags = span_context.trace_flags();
 
     format!("00-{}-{}-{:02x}", trace_id, span_id, trace_flags.to_u8())
@@ -37,7 +37,7 @@ pub fn add_span_link_from(span: &tracing::Span, cloud_event: &Event) {
     let current_binding = span.context();
     let current_otel_span = current_binding.span();
 
-    let remote_context = extrace_span_context_from(&trace_parent);
+    let remote_context = extract_span_context_from(&trace_parent);
 
     match remote_context {
         Some(remote_span_context) => {
@@ -68,7 +68,7 @@ pub fn add_parent_context_from(span: &tracing::Span, cloud_event: &Event) {
         }
     };
 
-    let remote_context = extrace_span_context_from(&trace_parent);
+    let remote_context = extract_span_context_from(&trace_parent);
 
     match remote_context {
         Some(remote_span_context) => {
@@ -84,7 +84,7 @@ pub fn add_parent_context_from(span: &tracing::Span, cloud_event: &Event) {
 }
 
 /// Generate a span context from the trace_id and span_id fields
-fn extrace_span_context_from(trace_parent: &str) -> Option<SpanContext> {
+fn extract_span_context_from(trace_parent: &str) -> Option<SpanContext> {
     let trace_parts: Vec<&str> = trace_parent.split("-").collect();
 
     if trace_parts.len() < 4 {

@@ -10,9 +10,7 @@ mod event_handler;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let otel_guard =
-        Arc::new(shared::observability::init_otel().expect("Failed to initialize telemetry"));
-    
+    let otel_guard = Arc::new(shared::observability::init_otel().expect("Failed to initialize telemetry"));
     let aws_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
     let dynamodb_client = aws_sdk_dynamodb::Client::new(&aws_config);
     let config = config::Config::load()?;
