@@ -1,7 +1,9 @@
 [workspace]
 resolver = "2"
 members = [
-  "examples/sqs-sendmessage-structured",
+  "examples/otel-simple",
+  "examples/sqs-receive-traced-message",
+  "examples/sqs-send-traced-message",
   "examples/lambda-process-sqs",
   "shared",
   "lambdas/create_link",

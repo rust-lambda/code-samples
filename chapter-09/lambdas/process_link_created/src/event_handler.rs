@@ -2,20 +2,31 @@ use aws_lambda_events::{
     event::sqs::SqsEvent,
     sqs::{BatchItemFailure, SqsBatchResponse, SqsMessage},
 };
+use cloudevents::AttributesReader;
 use lambda_runtime::{tracing, Error, LambdaEvent};
-use shared::core::{ShortUrl, UrlInfo, UrlRepository};
+use opentelemetry::global;
+use shared::{
+    core::{ShortUrl, UrlInfo, UrlRepository},
+    observability::add_span_link_from,
+};
 
 pub(crate) struct HandlerDeps<R: UrlRepository, I: UrlInfo> {
     pub url_repo: R,
     pub url_info: I,
 }
 
+#[tracing::instrument(skip(deps, event))]
 pub(crate) async fn function_handler<R: UrlRepository, I: UrlInfo>(
     deps: &HandlerDeps<R, I>,
     event: LambdaEvent<SqsEvent>,
 ) -> Result<SqsBatchResponse, Error> {
+    let meter = global::meter("process_link_created");
+    let link_created_counter = meter.u64_counter("links_created").build();
+
     let mut sqs_batch_response = SqsBatchResponse::default();
     let payload = event.clone().payload;
+    let batch_count = payload.records.len();
+
     let tasks: Vec<_> = event
         .payload
         .records
@@ -39,17 +50,24 @@ pub(crate) async fn function_handler<R: UrlRepository, I: UrlInfo>(
         })
         .collect::<Vec<BatchItemFailure>>();
 
+    link_created_counter.add(batch_count as u64 - failure_items.len() as u64, &[]);
+
     sqs_batch_response.batch_item_failures = failure_items;
     Ok(sqs_batch_response)
 }
 
+#[tracing::instrument("process link_created.v1", skip(url_repo, url_info, message), fields(
+    messaging.message.id = tracing::field::Empty,
+    messaging.operation.name = "process",
+    messaging.destination = "aws_sqs",
+    messaging.client.id = "process_link_created",
+))]
 async fn process_message<R: UrlRepository, I: UrlInfo>(
     url_repo: &R,
     url_info: &I,
     message: SqsMessage,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let url = message.body.clone();
-    if url.is_none() {
+    if message.body.clone().is_none() {
         tracing::warn!(
             "Discarding empty SQS message body for message {:?}",
             message.message_id
@@ -57,7 +75,29 @@ async fn process_message<R: UrlRepository, I: UrlInfo>(
         // NOTE: we don't add this to the failed list as we don't want to reprocess it
         return Ok(());
     }
-    let short_url: ShortUrl = serde_json::from_str(&url.unwrap())?;
+
+    let current_span = tracing::Span::current();
+    let cloud_event: cloudevents::Event =
+        match serde_json::from_str(message.body.as_ref().unwrap_or(&"".to_string())) {
+            Ok(event) => event,
+            Err(e) => {
+                tracing::error!("Failed to deserialize CloudEvent: {:?}", e);
+                return Err(Box::new(e));
+            }
+        };
+
+    tracing::Span::current().record("messaging.message.id", &cloud_event.id().to_string());
+
+    add_span_link_from(&current_span, &cloud_event);
+
+    let cloud_event_data = cloud_event.data().ok_or("CloudEvent has no data")?;
+
+    let short_url: ShortUrl = match cloud_event_data {
+        cloudevents::Data::Binary(items) => serde_json::from_slice(items)?,
+        cloudevents::Data::String(string_data) => serde_json::from_str(&string_data)?,
+        cloudevents::Data::Json(value) => serde_json::from_value(value.clone())?,
+    };
+
     let info = url_info.fetch_details(&short_url.original_link).await?;
     tracing::debug!(
         "Fetched info for URL {}: {:?}",

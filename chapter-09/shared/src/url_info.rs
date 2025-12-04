@@ -23,6 +23,7 @@ impl HttpUrlInfo {
 
 #[async_trait]
 impl UrlInfo for HttpUrlInfo {
+    #[tracing::instrument(skip(self, url))]
     async fn fetch_details(&self, url: &str) -> Result<UrlDetails, String> {
         let response = self
             .http_client
