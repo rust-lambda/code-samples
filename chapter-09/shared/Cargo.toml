@@ -8,6 +8,8 @@ resolver = "2"
 mocks = ["dep:mockall"]
 
 [dependencies]
+thiserror = "2.0.17"
+anyhow = "1.0.100"
 scraper = "0.23.1"
 cuid2 = "0.1"
 serde = "1.0"
@@ -23,6 +25,24 @@ lambda_http = "0.14"
 async-trait = "0.1.81"
 mockall = { version = "0.13", optional = true }
 figment = { version = "0.10.19", features = ["env", "json", "test"] }
+
+opentelemetry = { version = "0.31.0", features = ["logs"] }
+opentelemetry-appender-log = "0.31.0"
+opentelemetry-otlp = { version = "0.31.0", features = [
+  "grpc-tonic",
+  "trace",
+  "metrics",
+  "logs",
+] }
+opentelemetry-resource-detectors = "0.10.0"
+opentelemetry_sdk = { version = "0.31.0", features = ["rt-tokio"] }
+opentelemetry-stdout = "0.31.0"
+opentelemetry-appender-tracing = {version = "0.31.1", features = ["experimental_metadata_attributes"] }
+
+tracing = { version = "0.1.43", features = ["std"] }
+tracing-subscriber = { version = "0.3.22", features = ["registry", "std"] }
+tracing-opentelemetry = "0.32.0"
+cloudevents-sdk = "0.9.0"
 
 [dev-dependencies]
 mockall = "0.13"
