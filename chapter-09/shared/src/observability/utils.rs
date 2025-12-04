@@ -1,12 +1,10 @@
 use cloudevents::Event;
 use opentelemetry::{
-    trace::{SpanContext, TraceState},
-    SpanId, TraceFlags, TraceId,
+    Context, SpanId, TraceFlags, TraceId, trace::{SpanContext, TraceState}
 };
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 pub fn get_traceparent_extension_value(span: &tracing::Span) -> String {
-    use opentelemetry::global;
     use opentelemetry::trace::TraceContextExt;
 
     let binding = span.context();
@@ -44,6 +42,37 @@ pub fn add_span_link_from(span: &tracing::Span, cloud_event: &Event) {
     match remote_context {
         Some(remote_span_context) => {
             current_otel_span.add_link(remote_span_context, vec![]);
+        }
+        None => {
+            tracing::warn!(
+                "Failed to extract span context from traceparent: {}",
+                trace_parent
+            );
+        }
+    }
+}
+
+pub fn add_parent_context_from(span: &tracing::Span, cloud_event: &Event) {
+    use opentelemetry::trace::TraceContextExt;
+
+    let trace_parent = cloud_event.extension("traceparent");
+
+    let trace_parent = match trace_parent {
+        Some(value) => {
+            tracing::info!("Extracted traceparent: {:?}", value);
+            value.to_string()
+        }
+        None => {
+            tracing::info!("No traceparent found in CloudEvent");
+            return;
+        }
+    };
+
+    let remote_context = extrace_span_context_from(&trace_parent);
+
+    match remote_context {
+        Some(remote_span_context) => {
+            let _ = span.set_parent(Context::new().with_remote_span_context(remote_span_context.clone()));
         }
         None => {
             tracing::warn!(

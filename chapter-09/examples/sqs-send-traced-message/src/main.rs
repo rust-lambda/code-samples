@@ -35,7 +35,7 @@ async fn run_message_sender() {
 
     let event: cloudevents::Event = EventBuilderV10::new()
         .id(CuidGenerator::new().generate_id().to_string())
-        .ty("dev.example")
+        .ty("scrape_link_message.v1")
         .source("http://dev.example.com")
         .data("application/json", message_body)
         .extension("traceparent", extension_value)

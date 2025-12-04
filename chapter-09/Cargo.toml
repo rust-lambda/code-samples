@@ -3,7 +3,7 @@ resolver = "2"
 members = [
   "examples/otel-simple",
   "examples/sqs-receive-traced-message",
-  "examples/sqs-sendmessage-structured",
+  "examples/sqs-send-traced-message",
   "examples/lambda-process-sqs",
   "shared",
   "lambdas/create_link",

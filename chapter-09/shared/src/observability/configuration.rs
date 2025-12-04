@@ -1,9 +1,12 @@
 use anyhow::Result;
 
-use opentelemetry::{global, trace::TracerProvider};
+use opentelemetry::{
+    global,
+    trace::TracerProvider,
+};
 use opentelemetry_appender_tracing::layer;
 use opentelemetry_aws::detector::LambdaResourceDetector;
-use opentelemetry_otlp::{MetricExporter, SpanExporter};
+use opentelemetry_otlp::{LogExporter, MetricExporter, SpanExporter};
 use opentelemetry_resource_detectors::{OsResourceDetector, ProcessResourceDetector};
 use opentelemetry_sdk::{
     logs::SdkLoggerProvider,
@@ -18,8 +21,6 @@ use opentelemetry_sdk::{
 };
 use tracing::Level;
 use tracing_opentelemetry::{MetricsLayer, OpenTelemetryLayer};
-
-use std::env;
 
 use tracing_subscriber::{prelude::*, EnvFilter};
 
@@ -79,7 +80,13 @@ fn init_meter_provider() -> SdkMeterProvider {
 // The init_logger_provider function initialises a Logger Provider
 // And sets up a Log Appender for the log crate, bridging logs to the OpenTelemetry Logger.
 fn init_logger_provider() -> SdkLoggerProvider {
-    let exporter = opentelemetry_stdout::LogExporter::default();
+    // You can optionally use a stdout exporter to print logs to stdout instead of sending OTLP.
+    let _stdout_exporter = opentelemetry_stdout::LogExporter::default();
+
+    let otlp_exporter = LogExporter::builder()
+        .with_tonic()
+        .build()
+        .expect("Failed to create log exporter");
 
     let lambda_detector = LambdaResourceDetector {};
 
@@ -87,7 +94,7 @@ fn init_logger_provider() -> SdkLoggerProvider {
         .with_resource(
             Resource::builder()
                 .with_service_name(
-                    env::var("SERVICE_NAME").unwrap_or("unknown-service".to_string()),
+                    std::env::var("OTEL_SERVICE_NAME").unwrap_or("unknown-service".to_string()),
                 )
                 .build(),
         )
@@ -97,7 +104,7 @@ fn init_logger_provider() -> SdkLoggerProvider {
         .with_resource(EnvResourceDetector::new().detect())
         .with_resource(TelemetryResourceDetector.detect())
         .with_resource(lambda_detector.detect())
-        .with_simple_exporter(exporter)
+        .with_simple_exporter(otlp_exporter)
         .build();
 
     logger_provider
@@ -118,20 +125,11 @@ pub fn init_otel() -> Result<OtelGuard> {
         .add_directive("reqwest=off".parse().unwrap());
     let otel_layer = layer::OpenTelemetryTracingBridge::new(&logger).with_filter(filter_otel);
 
-    // Create a new tracing::Fmt layer to print the logs to stdout. It has a
-    // default filter of `info` level and above, and `debug` and above for logs
-    // from OpenTelemetry crates. The filter levels can be customized as needed.
-    let filter_fmt = EnvFilter::new("info").add_directive("opentelemetry=debug".parse().unwrap());
-    let fmt_layer = tracing_subscriber::fmt::layer()
-        .with_thread_names(true)
-        .with_filter(filter_fmt);
-
     tracing_subscriber::registry()
         .with(tracing_subscriber::filter::LevelFilter::from_level(
             Level::INFO,
         ))
         .with(otel_layer)
-        .with(fmt_layer)
         .with(MetricsLayer::new(meter.clone()))
         .with(OpenTelemetryLayer::new(tracer))
         .init();

@@ -16,16 +16,32 @@ Globals:
         ROTEL_EXPORTER_TRACES_AUTHENTICATOR: sigv4auth
         ROTEL_EXPORTER_TRACES_ENDPOINT: !Sub "https://xray.${AWS::Region}.amazonaws.com"
         ROTEL_EXPORTER_TRACES_PROTOCOL: "http"
-        ROTEL_EXPORTERS: "traces:otlp,metrics:awsemf"
+        ROTEL_EXPORTERS: "traces:otlp,metrics:awsemf,logs:otlp"
+        ROTEL_EXPORTER_LOGS_PROTOCOL: http
+        ROTEL_EXPORTER_LOGS_ENDPOINT: !Sub "https://logs.${AWS::Region}.amazonaws.com"
+        ROTEL_EXPORTER_LOGS_CUSTOM_HEADERS: !Sub "x-aws-log-group=/aws/lambda/otel-logs-${Env},x-aws-log-stream=otel_logs_${Env}"
+        ROTEL_EXPORTER_LOGS_AUTHENTICATOR: sigv4auth
+        ROTEL_EXPORTERS_LOGS: logs
         ROTEL_AWSEMF_EXPORTER_REGION: !Sub ${AWS::Region}
         ROTEL_EXPORTERS_TRACES: "traces"
         ROTEL_EXPORTERS_METRICS: "metrics"
         RUST_LOG: "info"
     Layers:
       - !Sub arn:aws:lambda:${AWS::Region}:418653438961:layer:rotel-extension-arm64-alpha:39
-        
 
-Resources:  
+Resources:
+  OpenTelemetryLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      RetentionInDays: 7
+      LogGroupName: !Sub /aws/lambda/otel-logs-${Env}
+
+  OpenTelemetryLogStream: 
+    Type: AWS::Logs::LogStream
+    Properties: 
+      LogGroupName:  !Ref OpenTelemetryLogGroup
+      LogStreamName: !Sub "otel_logs_${Env}"
+
   VisitLinkFunction:
     Metadata:
       BuildMethod: rust-cargolambda
@@ -55,7 +71,7 @@ Resources:
         - Statement:
             Sid: KinesisPutRecordsPolicy
             Effect: Allow
-            Action: 
+            Action:
               - kinesis:PutRecord
               - kinesis:PutRecords
             Resource:
@@ -64,7 +80,7 @@ Resources:
         - Statement:
             Sid: CloudWatchPermissions
             Effect: Allow
-            Action: 
+            Action:
               - xray:PutTraceSegments
               - xray:PutSpans
               - xray:PutSpansForIndexing
@@ -105,7 +121,7 @@ Resources:
         - Statement:
             Sid: CloudWatchPermissions
             Effect: Allow
-            Action: 
+            Action:
               - xray:PutTraceSegments
               - xray:PutSpans
               - xray:PutSpansForIndexing
@@ -141,7 +157,7 @@ Resources:
         - Statement:
             Sid: CloudWatchPermissions
             Effect: Allow
-            Action: 
+            Action:
               - xray:PutTraceSegments
               - xray:PutSpans
               - xray:PutSpansForIndexing
@@ -172,9 +188,9 @@ Resources:
             Queue: !GetAtt LinkCreatedQueue.Arn
             BatchSize: 20
             MaximumBatchingWindowInSeconds: 10
-            ScalingConfig: 
+            ScalingConfig:
               MaximumConcurrency: 4
-            FunctionResponseTypes: 
+            FunctionResponseTypes:
               - ReportBatchItemFailures
       Policies:
         - DynamoDBWritePolicy:
@@ -183,7 +199,7 @@ Resources:
         - Statement:
             Sid: CloudWatchPermissions
             Effect: Allow
-            Action: 
+            Action:
               - xray:PutTraceSegments
               - xray:PutSpans
               - xray:PutSpansForIndexing
@@ -223,7 +239,7 @@ Resources:
         - Statement:
             Sid: CloudWatchPermissions
             Effect: Allow
-            Action: 
+            Action:
               - xray:PutTraceSegments
               - xray:PutSpans
               - xray:PutSpansForIndexing
@@ -231,7 +247,6 @@ Resources:
               - logs:CreateLogStream
               - logs:PutLogEvents
             Resource: "*"
-
 
   LinksTable:
     DeletionPolicy: Delete
@@ -248,7 +263,7 @@ Resources:
         - AttributeName: LinkId
           AttributeType: S
       BillingMode: PAY_PER_REQUEST
-  
+
   LinkCreatedQueue:
     Type: AWS::SQS::Queue
     DeletionPolicy: Delete
@@ -257,7 +272,7 @@ Resources:
       QueueName: !Sub LinkCreatedQueue-${Env}
       MessageRetentionPeriod: 86400 # 1 day
       VisibilityTimeout: 730 # ~12 minutes
-      RedrivePolicy: 
+      RedrivePolicy:
         deadLetterTargetArn: !GetAtt LinkCreatedDLQ.Arn
         maxReceiveCount: 3
 
@@ -288,7 +303,7 @@ Outputs:
   LinkCreatedQueueUrl:
     Description: "LinkCreatedQueue URL"
     Value: !Ref LinkCreatedQueue
-    Export: 
+    Export:
       Name: !Sub LinkCreatedQueueUrl-${Env}
   LinkClickedStreamName:
     Description: "LinkClickedStream name"
