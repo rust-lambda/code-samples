@@ -40,7 +40,7 @@ async fn receive_sqs_message() {
             );
             tracing::Span::current().record(
                 "messaging.batch.message_count",
-                &output.messages.as_ref().map_or(0, |m| m.len()),
+                output.messages.as_ref().map_or(0, |m| m.len()),
             );
             for message in output.messages.unwrap_or_default().iter() {
                 let _ = process_sqs_message(&sqs_client, message).await;
@@ -72,7 +72,7 @@ async fn process_sqs_message(sqs_client: &aws_sdk_sqs::Client, message: &Message
             }
         };
 
-    tracing::Span::current().record("messaging.message.id", &cloud_event.id().to_string());
+    tracing::Span::current().record("messaging.message.id", cloud_event.id().to_string());
 
     add_span_link_from(&current_span, &cloud_event);
 
