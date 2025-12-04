@@ -23,6 +23,7 @@ impl DynamoDbUrlRepository {
 
 #[async_trait]
 impl UrlRepository for DynamoDbUrlRepository {
+    #[tracing::instrument(skip(self, short_link))]
     async fn get_url_from_short_link(&self, short_link: &str) -> Result<Option<ShortUrl>, String> {
         let result = self
             .dynamodb_client
@@ -42,6 +43,7 @@ impl UrlRepository for DynamoDbUrlRepository {
         }
     }
 
+    #[tracing::instrument(skip(self, url_to_shorten, short_url))]
     async fn store_short_url(
         &self,
         url_to_shorten: String,
@@ -63,6 +65,7 @@ impl UrlRepository for DynamoDbUrlRepository {
             .map_err(|e| format!("Error adding item: {:?}", e))
     }
 
+    #[tracing::instrument(skip(self, short_link, url_details))]
     async fn add_details_to_short_url(
         &self,
         short_link: String,
@@ -112,6 +115,7 @@ impl UrlRepository for DynamoDbUrlRepository {
             .map_err(|e| format!("Error updating item: {:?}", e))
     }
 
+    #[tracing::instrument(skip(self, short_link, n))]
     async fn increment_clicks(&self, short_link: &str, n: u64) -> Result<(), String> {
         self.dynamodb_client
             .update_item()
@@ -127,6 +131,7 @@ impl UrlRepository for DynamoDbUrlRepository {
             .map_err(|e| format!("Error incrementing clicks: {:?}", e))
     }
 
+    #[tracing::instrument(skip(self, last_evaluated_id))]
     async fn list_urls(
         &self,
         last_evaluated_id: Option<String>,

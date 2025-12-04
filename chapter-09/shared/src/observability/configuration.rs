@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use opentelemetry::{global, trace::TracerProvider};
 use opentelemetry_appender_tracing::layer;
-
+use opentelemetry_aws::detector::LambdaResourceDetector;
 use opentelemetry_otlp::{MetricExporter, SpanExporter};
 use opentelemetry_resource_detectors::{OsResourceDetector, ProcessResourceDetector};
 use opentelemetry_sdk::{
@@ -34,12 +34,15 @@ fn init_tracer() -> SdkTracerProvider {
         .build()
         .expect("Failed to create span exporter");
 
+    let lambda_detector = LambdaResourceDetector {};
+
     let tracer_provider = SdkTracerProvider::builder()
         .with_resource(OsResourceDetector.detect())
         .with_resource(ProcessResourceDetector.detect())
         .with_resource(SdkProvidedResourceDetector.detect())
         .with_resource(EnvResourceDetector::new().detect())
         .with_resource(TelemetryResourceDetector.detect())
+        .with_resource(lambda_detector.detect())
         .with_id_generator(RandomIdGenerator::default())
         .with_batch_exporter(exporter)
         .build();
@@ -55,6 +58,8 @@ fn init_meter_provider() -> SdkMeterProvider {
         .build()
         .expect("Failed to create metric exporter");
 
+    let lambda_detector = LambdaResourceDetector {};
+
     let meter_provider = SdkMeterProvider::builder()
         .with_periodic_exporter(exporter)
         .with_resource(OsResourceDetector.detect())
@@ -62,6 +67,7 @@ fn init_meter_provider() -> SdkMeterProvider {
         .with_resource(SdkProvidedResourceDetector.detect())
         .with_resource(EnvResourceDetector::new().detect())
         .with_resource(TelemetryResourceDetector.detect())
+        .with_resource(lambda_detector.detect())
         .build();
 
     global::set_meter_provider(meter_provider.clone());
@@ -74,6 +80,8 @@ fn init_meter_provider() -> SdkMeterProvider {
 // And sets up a Log Appender for the log crate, bridging logs to the OpenTelemetry Logger.
 fn init_logger_provider() -> SdkLoggerProvider {
     let exporter = opentelemetry_stdout::LogExporter::default();
+
+    let lambda_detector = LambdaResourceDetector {};
 
     let logger_provider = SdkLoggerProvider::builder()
         .with_resource(
@@ -88,6 +96,7 @@ fn init_logger_provider() -> SdkLoggerProvider {
         .with_resource(SdkProvidedResourceDetector.detect())
         .with_resource(EnvResourceDetector::new().detect())
         .with_resource(TelemetryResourceDetector.detect())
+        .with_resource(lambda_detector.detect())
         .with_simple_exporter(exporter)
         .build();
 

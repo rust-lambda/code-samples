@@ -1,0 +1,302 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  Env:
+    Description: The deployment environment
+    Type: String
+
+Globals:
+  Function:
+    Timeout: 3
+    Environment:
+      Variables:
+        APP_TABLE_NAME: !Ref LinksTable
+        ROTEL_AWSXRAY_EXPORTER_REGION: !Sub ${AWS::Region}
+        ROTEL_EXPORTER_TRACES_AUTHENTICATOR: sigv4auth
+        ROTEL_EXPORTER_TRACES_ENDPOINT: !Sub "https://xray.${AWS::Region}.amazonaws.com"
+        ROTEL_EXPORTER_TRACES_PROTOCOL: "http"
+        ROTEL_EXPORTERS: "traces:otlp,metrics:awsemf"
+        ROTEL_AWSEMF_EXPORTER_REGION: !Sub ${AWS::Region}
+        ROTEL_EXPORTERS_TRACES: "traces"
+        ROTEL_EXPORTERS_METRICS: "metrics"
+        RUST_LOG: "info"
+    Layers:
+      - !Sub arn:aws:lambda:${AWS::Region}:418653438961:layer:rotel-extension-arm64-alpha:39
+        
+
+Resources:  
+  VisitLinkFunction:
+    Metadata:
+      BuildMethod: rust-cargolambda
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./lambdas/visit_link
+      Handler: bootstrap
+      FunctionName: !Sub VisitLinkFunction-${Env}
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref LinksTable
+          STREAM_NAME: !Ref LinkClickedStream
+      Events:
+        GetLinks:
+          Type: HttpApi
+          Properties:
+            Path: /{linkId}
+            Method: GET
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref LinksTable
+        # NOTE: No SAM policy template for Kinesis PutRecords (Write only)
+        #   so we define it inline here
+        - Statement:
+            Sid: KinesisPutRecordsPolicy
+            Effect: Allow
+            Action: 
+              - kinesis:PutRecord
+              - kinesis:PutRecords
+            Resource:
+              - !GetAtt LinkClickedStream.Arn
+        # Permissions for XRay and OTEL
+        - Statement:
+            Sid: CloudWatchPermissions
+            Effect: Allow
+            Action: 
+              - xray:PutTraceSegments
+              - xray:PutSpans
+              - xray:PutSpansForIndexing
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: "*"
+
+  CreateLinkFunction:
+    Metadata:
+      BuildMethod: rust-cargolambda
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./lambdas/create_link
+      Handler: bootstrap
+      FunctionName: !Sub CreateLinkFunction-${Env}
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      Environment:
+        Variables:
+          QUEUE_URL: !Ref LinkCreatedQueue
+          TABLE_NAME: !Ref LinksTable
+      Events:
+        CreateLink:
+          Type: HttpApi
+          Properties:
+            Path: /links
+            Method: POST
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref LinksTable
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt LinkCreatedQueue.QueueName
+        - EventBridgePutEventsPolicy:
+            EventBusName: default
+        # Permissions for XRay and OTEL
+        - Statement:
+            Sid: CloudWatchPermissions
+            Effect: Allow
+            Action: 
+              - xray:PutTraceSegments
+              - xray:PutSpans
+              - xray:PutSpansForIndexing
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: "*"
+
+  GetLinksFunction:
+    Metadata:
+      BuildMethod: rust-cargolambda
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./lambdas/get_links
+      Handler: bootstrap
+      FunctionName: !Sub GetLinksFunction-${Env}
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref LinksTable
+      Events:
+        GetLinks:
+          Type: HttpApi
+          Properties:
+            Path: /links
+            Method: GET
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref LinksTable
+        # Permissions for XRay and OTEL
+        - Statement:
+            Sid: CloudWatchPermissions
+            Effect: Allow
+            Action: 
+              - xray:PutTraceSegments
+              - xray:PutSpans
+              - xray:PutSpansForIndexing
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: "*"
+
+  ProcessLinkCreatedFunction:
+    Metadata:
+      BuildMethod: rust-cargolambda
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./lambdas/process_link_created
+      Handler: bootstrap
+      FunctionName: !Sub ProcessLinkCreatedFunction-${Env}
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      Timeout: 120
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref LinksTable
+      Events:
+        LinkCreatedEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt LinkCreatedQueue.Arn
+            BatchSize: 20
+            MaximumBatchingWindowInSeconds: 10
+            ScalingConfig: 
+              MaximumConcurrency: 4
+            FunctionResponseTypes: 
+              - ReportBatchItemFailures
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref LinksTable
+        # Permissions for XRay and OTEL
+        - Statement:
+            Sid: CloudWatchPermissions
+            Effect: Allow
+            Action: 
+              - xray:PutTraceSegments
+              - xray:PutSpans
+              - xray:PutSpansForIndexing
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: "*"
+
+  ProcessLinkClickedFunction:
+    Metadata:
+      BuildMethod: rust-cargolambda
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./lambdas/process_link_clicked
+      Handler: bootstrap
+      FunctionName: !Sub ProcessLinkClickedFunction-${Env}
+      Runtime: provided.al2023
+      Architectures:
+        - arm64
+      Timeout: 120
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref LinksTable
+      Events:
+        LinkClickedEvent:
+          Type: Kinesis
+          Properties:
+            Stream: !GetAtt LinkClickedStream.Arn
+            BatchSize: 10000
+            MaximumBatchingWindowInSeconds: 300
+            StartingPosition: TRIM_HORIZON
+            MaximumRetryAttempts: 2
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref LinksTable
+        # Permissions for XRay and OTEL
+        - Statement:
+            Sid: CloudWatchPermissions
+            Effect: Allow
+            Action: 
+              - xray:PutTraceSegments
+              - xray:PutSpans
+              - xray:PutSpansForIndexing
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: "*"
+
+
+  LinksTable:
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub LinksTable-${Env}
+      SSESpecification:
+        SSEEnabled: true
+      KeySchema:
+        - AttributeName: LinkId
+          KeyType: HASH
+      AttributeDefinitions:
+        - AttributeName: LinkId
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+  
+  LinkCreatedQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      QueueName: !Sub LinkCreatedQueue-${Env}
+      MessageRetentionPeriod: 86400 # 1 day
+      VisibilityTimeout: 730 # ~12 minutes
+      RedrivePolicy: 
+        deadLetterTargetArn: !GetAtt LinkCreatedDLQ.Arn
+        maxReceiveCount: 3
+
+  LinkCreatedDLQ:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      QueueName: !Sub LinkCreatedDLQ-${Env}
+      MessageRetentionPeriod: 1209600 # 14 days
+
+  LinkClickedStream:
+    Type: AWS::Kinesis::Stream
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Name: !Sub LinkClickedStream-${Env}
+      StreamModeDetails:
+        StreamMode: ON_DEMAND
+      RetentionPeriodHours: 24
+
+Outputs:
+  LinksTableName:
+    Description: "LinksTable name"
+    Value: !Ref LinksTable
+    Export:
+      Name: !Sub LinksTableName-${Env}
+  LinkCreatedQueueUrl:
+    Description: "LinkCreatedQueue URL"
+    Value: !Ref LinkCreatedQueue
+    Export: 
+      Name: !Sub LinkCreatedQueueUrl-${Env}
+  LinkClickedStreamName:
+    Description: "LinkClickedStream name"
+    Value: !Ref LinkClickedStream
+    Export:
+      Name: !Sub LinkClickedStreamName-${Env}
+  UrlShortenerEndpoint:
+    Description: "API endpoint"
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/"
+    Export:
+      Name: !Sub UrlShortenerEndpoint-${Env}
