@@ -35,7 +35,7 @@ pub(crate) async fn function_handler(
             } else if let Some(url) = url_shortener.retrieve_url(link_id) {
                 redirect_response(&url)
             } else {
-                Ok(empty_response(&StatusCode::NOT_FOUND)?)
+                empty_response(&StatusCode::NOT_FOUND)
             }
         }
         _ => empty_response(&StatusCode::METHOD_NOT_ALLOWED),
