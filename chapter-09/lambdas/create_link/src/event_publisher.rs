@@ -69,7 +69,7 @@ impl EventPublisher for SqsEventBridgePublisher {
             .put_events()
             .entries(
                 PutEventsRequestEntry::builder()
-                    .source("link_shortener")
+                    .source("custom.link_shortener")
                     .detail_type("LinkCreated")
                     .detail(message_body.clone())
                     .build(),
