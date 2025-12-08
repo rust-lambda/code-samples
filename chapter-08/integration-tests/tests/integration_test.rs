@@ -72,7 +72,7 @@ async fn when_invalid_body_is_passed_application_should_return_400_error() {
 async fn retrieve_api_endpoint() -> String {
     let config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
     let cloudformation_client = aws_sdk_cloudformation::Client::new(&config);
-    let stack_name = env::var("STACK_NAME").unwrap_or("rust-link-shorten".to_string());
+    let stack_name = env::var("STACK_NAME").unwrap_or("LinkShortener-dev".to_string());
     let env = env::var("ENV")
         .expect("The current environment should be set using the 'ENV' environment variable");
 

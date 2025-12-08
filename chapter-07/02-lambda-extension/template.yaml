@@ -48,7 +48,7 @@ Resources:
       Architectures:
         - arm64
       Events:
-        GetLinks:
+        VisitLink:
           Type: HttpApi
           Properties:
             Path: /{linkId}

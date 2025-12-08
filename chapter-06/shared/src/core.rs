@@ -192,7 +192,7 @@ mod tests {
         let mut url_repo = MockUrlRepository::new();
         url_repo
             .expect_get_url_from_short_link()
-            .with(predicate::eq(test_short_url.to_string()))
+            .with(predicate::eq(test_short_url))
             .times(1)
             .returning(|_url_to_shorten| Ok(Some("https://google.com".to_string())));
 
@@ -217,7 +217,7 @@ mod tests {
         let mut url_repo = MockUrlRepository::new();
         url_repo
             .expect_get_url_from_short_link()
-            .with(predicate::eq(test_short_url.to_string()))
+            .with(predicate::eq(test_short_url))
             .times(1)
             .returning(|_url_to_shorten| Err("Not found".to_string()));
 

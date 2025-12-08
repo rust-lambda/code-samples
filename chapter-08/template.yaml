@@ -30,7 +30,7 @@ Resources:
           TABLE_NAME: !Ref LinksTable
           STREAM_NAME: !Ref LinkClickedStream
       Events:
-        GetLinks:
+        VisitLink:
           Type: HttpApi
           Properties:
             Path: /{linkId}
