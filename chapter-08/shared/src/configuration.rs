@@ -53,7 +53,7 @@ impl Configuration {
                 String::new()
             }
         };
-        if configuration_ssm_parameter_name.len() > 0 {
+        if !configuration_ssm_parameter_name.is_empty() {
             let ssm_configuration = ssm_client
                 .get_parameter()
                 .name(configuration_ssm_parameter_name)
@@ -79,7 +79,7 @@ impl Configuration {
             Ok(name) => name,
             Err(_) => String::new(),
         };
-        if configuration_secret_id.len() > 0 {
+        if !configuration_secret_id.is_empty() {
             let secret_value = secret_client
                 .get_secret_value()
                 .secret_id(configuration_secret_id)

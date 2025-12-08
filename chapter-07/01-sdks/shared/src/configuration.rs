@@ -8,11 +8,11 @@ use serde::{Deserialize, Serialize};
 // you'll see that in the chapter on observability
 #[derive(Default, Debug, Serialize, Deserialize)]
 enum LogLevel {
-    TRACE,
+    Trace,
     #[default]
-    INFO,
-    WARN,
-    ERROR,
+    Info,
+    Warn,
+    Error,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
@@ -67,7 +67,7 @@ impl Configuration {
                 String::new()
             }
         };
-        if configuration_ssm_parameter_name.len() > 0 {
+        if !configuration_ssm_parameter_name.is_empty() {
             let ssm_configuration = ssm_client
                 .get_parameter()
                 .name(configuration_ssm_parameter_name)
@@ -93,7 +93,7 @@ impl Configuration {
             Ok(name) => name,
             Err(_) => String::new(),
         };
-        if configuration_secret_id.len() > 0 {
+        if !configuration_secret_id.is_empty() {
             let secret_value = secret_client
                 .get_secret_value()
                 .secret_id(configuration_secret_id)
@@ -113,7 +113,7 @@ impl Configuration {
 impl std::fmt::Display for Configuration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.log_level {
-            LogLevel::TRACE | LogLevel::INFO => write!(
+            LogLevel::Trace | LogLevel::Info => write!(
                 f,
                 "Configuration {{ table_name: {}, log_level: {:?}, api_key: {:?} }}",
                 self.table_name, self.log_level, self.api_key
@@ -147,7 +147,7 @@ mod tests {
                 .unwrap();
 
             assert_eq!(config.table_name, "james-test-table");
-            assert!(matches!(config.log_level, LogLevel::INFO));
+            assert!(matches!(config.log_level, LogLevel::Info));
 
             Ok(())
         });
@@ -167,7 +167,7 @@ mod tests {
                 .unwrap();
 
             assert_eq!(config.table_name, "james-test-table");
-            assert!(matches!(config.log_level, LogLevel::INFO));
+            assert!(matches!(config.log_level, LogLevel::Info));
             assert_eq!(config.api_key, "test-api-key");
 
             Ok(())
