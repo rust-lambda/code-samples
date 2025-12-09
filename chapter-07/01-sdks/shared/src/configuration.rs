@@ -15,11 +15,21 @@ enum LogLevel {
     Error,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Configuration {
     pub table_name: String,
     pub log_level: LogLevel,
     pub api_key: String,
+}
+
+impl Default for Configuration {
+    fn default() -> Configuration {
+        Configuration {
+            table_name: "".to_string(),
+            log_level: LogLevel::Info,
+            api_key: "".to_string(),
+        }
+    }
 }
 
 impl Configuration {
@@ -37,9 +47,7 @@ impl Configuration {
         let secret_manager_configuration =
             Configuration::load_from_secret_manager(secret_client).await;
         config = match secret_manager_configuration {
-            Ok(secret_config) => config
-                // .join overrides any existing values with new values from this JSON
-                .join(Json::string(&secret_config)),
+            Ok(secret_config) => config.join(Json::string(&secret_config)),
             Err(_) => config,
         };
 
@@ -47,7 +55,7 @@ impl Configuration {
 
         match config {
             Ok(config) => {
-                println!("{}", config);
+                println!("{:?}", config);
                 config
             }
             Err(e) => {
