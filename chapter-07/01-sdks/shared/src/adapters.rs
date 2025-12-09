@@ -26,10 +26,7 @@ impl<'a> DynamoDbUrlRepository<'a> {
 
 #[async_trait]
 impl<'a> UrlRepository for DynamoDbUrlRepository<'a> {
-    async fn get_url_from_short_link(
-        &self,
-        short_link: &str,
-    ) -> Result<Option<String>, String> {
+    async fn get_url_from_short_link(&self, short_link: &str) -> Result<Option<String>, String> {
         let result = self
             .dynamodb_client
             .update_item()
@@ -122,13 +119,12 @@ impl<'a> UrlRepository for DynamoDbUrlRepository<'a> {
             .await
             .map_err(|e| format!("Error executing scan: {:?}", e))?;
 
-                let short_urls: Vec<ShortUrl> = result
+        let short_urls: Vec<ShortUrl> = result
             .items
             .unwrap_or_default()
             .into_iter()
             .filter_map(|item| ShortUrl::try_from(item).ok())
             .collect();
-
 
         let last_evaluated_id = result
             .last_evaluated_key

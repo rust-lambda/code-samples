@@ -183,7 +183,7 @@ impl Config for ConfigurationManager {
 impl std::fmt::Display for Configuration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.log_level {
-            LogLevel::TRACE | LogLevel::INFO => write!(
+            LogLevel::Trace | LogLevel::Info => write!(
                 f,
                 "Configuration {{ table_name: {}, log_level: {:?}, api_key: {:?} }}",
                 self.table_name, self.log_level, self.api_key
@@ -219,7 +219,7 @@ mod tests {
                 .unwrap();
 
             assert_eq!(config.table_name, "james-test-table");
-            assert!(matches!(config.log_level, LogLevel::INFO));
+            assert!(matches!(config.log_level, LogLevel::Info));
 
             Ok(())
         });
@@ -241,7 +241,7 @@ mod tests {
                 .unwrap();
 
             assert_eq!(config.table_name, "james-test-table-override");
-            assert!(matches!(config.log_level, LogLevel::ERROR));
+            assert!(matches!(config.log_level, LogLevel::Error));
 
             Ok(())
         });
@@ -259,7 +259,7 @@ mod tests {
 
             assert_eq!(config.table_name, "");
             assert_eq!(config.api_key, "");
-            assert!(matches!(config.log_level, LogLevel::INFO));
+            assert!(matches!(config.log_level, LogLevel::Info));
 
             Ok(())
         });
