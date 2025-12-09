@@ -210,7 +210,7 @@ mod tests {
             let config: Configuration = Figment::new()
                 .merge(Env::prefixed("APP_"))
                 .merge(Json::string(stringify!({
-                    "log_level": "INFO"
+                    "log_level": "Info"
                 })))
                 .merge(Json::string(stringify!({
                     "api_key": "my-test-api-key"
@@ -234,7 +234,7 @@ mod tests {
                 .merge(Env::prefixed("APP_"))
                 .merge(Json::string(stringify!({
                     "table_name": "james-test-table-override",
-                    "log_level": "ERROR",
+                    "log_level": "Error",
                     "api_key": "my-test"
                 })))
                 .extract()

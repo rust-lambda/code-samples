@@ -5,6 +5,7 @@ use shared::core::ShortUrl;
 use std::env;
 
 #[tokio::test]
+#[ignore = "requires deployed AWS infrastructure"]
 async fn when_valid_link_is_passed_should_retrieve_info_and_store() {
     let api_endpoint = retrieve_api_endpoint().await;
 
@@ -44,6 +45,7 @@ async fn when_valid_link_is_passed_should_retrieve_info_and_store() {
 }
 
 #[tokio::test]
+#[ignore = "requires deployed AWS infrastructure"]
 async fn when_invalid_body_is_passed_application_should_return_400_error() {
     let api_endpoint = retrieve_api_endpoint().await;
 

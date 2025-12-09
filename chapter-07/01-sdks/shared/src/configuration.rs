@@ -149,7 +149,7 @@ mod tests {
                 Figment::from(Serialized::defaults(Configuration::default()))
                     .merge(Env::prefixed("APP_"))
                     .merge(Json::string(stringify!({
-                        "log_level": "INFO",
+                        "log_level": "Info",
                         "api_key": "test-api-key"
                     })))
                     .extract()
