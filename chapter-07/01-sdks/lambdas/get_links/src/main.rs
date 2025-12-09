@@ -25,8 +25,5 @@ async fn main() -> Result<(), Error> {
     let url_repo = DynamoDbUrlRepository::new(&configuration, dynamodb_client);
     let shortener = UrlShortener::new(url_repo, url_info);
 
-    run(service_fn(|event| {
-        function_handler(&shortener, event)
-    }))
-    .await
+    run(service_fn(|event| function_handler(&shortener, event))).await
 }

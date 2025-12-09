@@ -16,12 +16,12 @@ pub trait Config {
 // you would typically use a LogLevel that comes from a logging crate.
 // you'll see that in the chapter on observability
 #[derive(Default, Debug, Serialize, Deserialize)]
-pub(crate) enum LogLevel {
-    TRACE,
+pub enum LogLevel {
+    Trace,
     #[default]
-    INFO,
-    WARN,
-    ERROR,
+    Info,
+    Warn,
+    Error,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
@@ -252,9 +252,10 @@ mod tests {
         figment::Jail::expect_with(|jail| {
             jail.set_env("APP_TABLE_NAME", "james-test-table");
 
-            let config: Configuration = Figment::from(Serialized::defaults(Configuration::default()))
-                .extract()
-                .unwrap();
+            let config: Configuration =
+                Figment::from(Serialized::defaults(Configuration::default()))
+                    .extract()
+                    .unwrap();
 
             assert_eq!(config.table_name, "");
             assert_eq!(config.api_key, "");

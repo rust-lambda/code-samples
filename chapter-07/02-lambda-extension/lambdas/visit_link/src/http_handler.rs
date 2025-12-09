@@ -144,7 +144,7 @@ mod tests {
             .expect_refresh()
             .times(1)
             .returning(|| Configuration::default());
-        
+
         mock_url_repo
             .expect_get_url_from_short_link()
             .times(1)

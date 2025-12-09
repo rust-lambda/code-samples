@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 // you would typically use a LogLevel that comes from a logging crate.
 // you'll see that in the chapter on observability
 #[derive(Default, Debug, Serialize, Deserialize)]
-enum LogLevel {
+pub enum LogLevel {
     Trace,
     #[default]
     Info,
@@ -145,14 +145,15 @@ mod tests {
         figment::Jail::expect_with(|jail| {
             jail.set_env("APP_TABLE_NAME", "james-test-table");
 
-            let config: Configuration = Figment::from(Serialized::defaults(Configuration::default()))
-                .merge(Env::prefixed("APP_"))
-                .merge(Json::string(stringify!({
-                    "log_level": "INFO",
-                    "api_key": "test-api-key"
-                })))
-                .extract()
-                .unwrap();
+            let config: Configuration =
+                Figment::from(Serialized::defaults(Configuration::default()))
+                    .merge(Env::prefixed("APP_"))
+                    .merge(Json::string(stringify!({
+                        "log_level": "INFO",
+                        "api_key": "test-api-key"
+                    })))
+                    .extract()
+                    .unwrap();
 
             assert_eq!(config.table_name, "james-test-table");
             assert!(matches!(config.log_level, LogLevel::Info));
@@ -166,13 +167,14 @@ mod tests {
         figment::Jail::expect_with(|jail| {
             jail.set_env("APP_TABLE_NAME", "james-test-table");
 
-            let config: Configuration = Figment::from(Serialized::defaults(Configuration::default()))
-                .merge(Env::prefixed("APP_"))
-                .merge(Json::string(stringify!({
-                    "api_key": "test-api-key"
-                })))
-                .extract()
-                .unwrap();
+            let config: Configuration =
+                Figment::from(Serialized::defaults(Configuration::default()))
+                    .merge(Env::prefixed("APP_"))
+                    .merge(Json::string(stringify!({
+                        "api_key": "test-api-key"
+                    })))
+                    .extract()
+                    .unwrap();
 
             assert_eq!(config.table_name, "james-test-table");
             assert!(matches!(config.log_level, LogLevel::Info));
