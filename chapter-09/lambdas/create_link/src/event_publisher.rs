@@ -1,6 +1,7 @@
 use aws_sdk_eventbridge::{operation::put_events::PutEventsError, types::PutEventsRequestEntry};
 use aws_sdk_sqs::operation::send_message::SendMessageError;
-use shared::core::ShortUrl;
+use cloudevents::{AttributesReader, EventBuilder, EventBuilderV10};
+use shared::core::{CuidGenerator, IdGenerator, ShortUrl};
 use std::fmt::Display;
 use thiserror::Error;
 
@@ -54,14 +55,33 @@ impl SqsEventBridgePublisher {
 }
 
 impl EventPublisher for SqsEventBridgePublisher {
+    #[tracing::instrument("publish link_created.v1", skip(self, short_url), fields(
+    messaging.message.id = tracing::field::Empty,
+    messaging.operation.name = "publish",
+    messaging.destination = "aws_sqs",
+    messaging.client.id = "create_link",
+))]
     async fn publish_link_created(&self, short_url: &ShortUrl) -> Result<(), Error> {
-        let message_body = serde_json::to_string(short_url).expect("Failed to serialize ShortUrl");
+        let current_span = tracing::Span::current();
+        let trace_parent = shared::observability::get_traceparent_extension_value(&current_span);
+
+        let event: cloudevents::Event = EventBuilderV10::new()
+            .id(CuidGenerator::new().generate_id().to_string())
+            .ty("rust-link-shortener")
+            .source("http://rust-link-shortener.com")
+            .data("application/json", serde_json::to_value(short_url)?)
+            .extension("traceparent", trace_parent)
+            .build()
+            .unwrap();
+        tracing::Span::current().record("messaging.message.id", &event.id().to_string());
+
+        let data: String = serde_json::to_string(&event)?;
 
         let send_to_queue = self
             .sqs_client
             .send_message()
             .queue_url(&self.queue_url)
-            .message_body(message_body.clone())
+            .message_body(data.clone())
             .send();
 
         let send_event = self
@@ -71,7 +91,7 @@ impl EventPublisher for SqsEventBridgePublisher {
                 PutEventsRequestEntry::builder()
                     .source("custom.link_shortener")
                     .detail_type("LinkCreated")
-                    .detail(message_body.clone())
+                    .detail(data.clone())
                     .build(),
             )
             .send();

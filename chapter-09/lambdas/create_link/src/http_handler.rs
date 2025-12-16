@@ -15,6 +15,7 @@ pub(crate) struct HandlerDeps<I: IdGenerator, R: UrlRepository, E: EventPublishe
     pub event_publisher: E,
 }
 
+#[tracing::instrument(skip(deps, event))]
 pub(crate) async fn function_handler<I: IdGenerator, R: UrlRepository, E: EventPublisher>(
     deps: &HandlerDeps<I, R, E>,
     event: Request,

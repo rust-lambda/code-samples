@@ -9,6 +9,7 @@ pub(crate) struct HandlerDeps<R: UrlRepository, E: EventPublisher> {
     pub event_publisher: E,
 }
 
+#[tracing::instrument(skip(deps, event))]
 pub(crate) async fn function_handler<R: UrlRepository, E: EventPublisher>(
     deps: &HandlerDeps<R, E>,
     event: Request,
