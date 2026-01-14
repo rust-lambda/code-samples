@@ -40,7 +40,10 @@ async fn run_message_sender() {
         .data("application/json", message_body)
         .extension("traceparent", extension_value)
         .build()
-        .unwrap();
+        .map_err(|e| {
+            tracing::error!("Failed to build CloudEvent: {}", e);
+            e
+        })?;
 
     publish_message(&event).await;
 }

@@ -1,7 +1,11 @@
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 use lambda_runtime::{run, service_fn, tracing, Error};
 mod event_handler;
+use ::tracing::Instrument;
 use event_handler::function_handler;
 use shared::{adapters::DynamoDbUrlRepository, url_info::HttpUrlInfo};
 
@@ -9,9 +13,12 @@ use crate::event_handler::HandlerDeps;
 
 mod config;
 
+static IS_COLD_START: AtomicBool = AtomicBool::new(true);
+
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    let otel_guard = Arc::new(shared::observability::init_otel().expect("Failed to initialize telemetry"));
+    let otel_guard =
+        Arc::new(shared::observability::init_otel().expect("Failed to initialize telemetry"));
     let aws_config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
     let dynamodb_client = aws_sdk_dynamodb::Client::new(&aws_config);
     let config = config::Config::load()?;
@@ -25,10 +32,23 @@ async fn main() -> Result<(), Error> {
     let handler_deps = HandlerDeps { url_repo, url_info };
 
     run(service_fn(|event| async {
-        let res = function_handler(&handler_deps, event).await;
+        let was_cold_start = IS_COLD_START.swap(false, Ordering::SeqCst);
+
+        let handler_span = tracing::info_span!(
+            "aws.lambda",
+            operation_name = "aws.lambda",
+            faas.coldstart = was_cold_start,
+            cloud.provider = "aws",
+            event_type = "pubsub"
+        );
+
+        let res = function_handler(&handler_deps, event)
+            .instrument(handler_span)
+            .await;
 
         otel_guard.flush();
 
         res
-    })).await
+    }))
+    .await
 }

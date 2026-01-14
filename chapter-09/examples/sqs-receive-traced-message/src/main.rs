@@ -47,7 +47,7 @@ async fn receive_sqs_message() {
             }
         }
         Err(e) => {
-            tracing::error!("Error receiving message: {:?}", e);
+            tracing::error!("Error Processing message: {:?}", e);
             return;
         }
     }
@@ -61,7 +61,7 @@ async fn receive_sqs_message() {
 ))]
 async fn process_sqs_message(sqs_client: &aws_sdk_sqs::Client, message: &Message) {
     let current_span = Span::current();
-    tracing::info!("Received message: {:?}", message.body);
+    tracing::info!("Processing message: {:?}", message.body);
 
     let cloud_event: cloudevents::Event =
         match serde_json::from_str(message.body.as_ref().unwrap_or(&"".to_string())) {

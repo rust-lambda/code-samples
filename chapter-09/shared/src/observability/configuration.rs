@@ -121,8 +121,8 @@ pub fn init_otel() -> Result<OtelGuard> {
         .add_directive("hyper=off".parse().unwrap())
         .add_directive("opentelemetry=off".parse().unwrap())
         .add_directive("tonic=off".parse().unwrap())
-        .add_directive("h2=off".parse().unwrap())
-        .add_directive("reqwest=off".parse().unwrap());
+        .add_directive("h2=off".parse().unwrap());
+    
     let otel_layer = layer::OpenTelemetryTracingBridge::new(&logger).with_filter(filter_otel);
 
     tracing_subscriber::registry()
