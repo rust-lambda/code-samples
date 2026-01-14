@@ -1,34 +1,40 @@
-use aws_lambda_events::event::kinesis::KinesisEvent;
+use aws_lambda_events::{event::kinesis::KinesisEvent, kinesis::KinesisEventRecord};
+use cloudevents::AttributesReader;
 use lambda_runtime::{tracing, Error, LambdaEvent};
-use shared::core::{ShortUrl, UrlRepository};
+use opentelemetry::global;
+use shared::{
+    core::{ShortUrl, UrlRepository},
+    observability::add_span_link_from,
+};
 use std::collections::HashMap;
 
 pub(crate) struct HandlerDeps<R: UrlRepository> {
     pub url_repo: R,
 }
 
+#[tracing::instrument(skip(deps, event))]
 pub(crate) async fn function_handler<R: UrlRepository>(
     deps: &HandlerDeps<R>,
     event: LambdaEvent<KinesisEvent>,
 ) -> Result<(), Error> {
+    let meter = global::meter("process_link_clicked");
+    let link_clicked_counter = meter.u64_counter("links_clicked").build();
+
     // Extract some useful information from the request
     let payload = event.payload;
 
     // Aggregate clicks by link ID
     let mut clicks_by_id: HashMap<String, u64> = HashMap::new();
     for record in payload.records {
-        let kinesis_record = record.kinesis;
-        let data = kinesis_record.data.as_ref();
-        // If we cannot deserialize, log and skip
-        let link_click_event: Result<ShortUrl, _> = serde_json::from_slice(data);
-        match link_click_event {
-            Err(e) => {
-                tracing::warn!("Failed to deserialize short_url: {:?}", e);
-                continue;
-            }
-            Ok(short_url) => {
-                let counter = clicks_by_id.entry(short_url.link_id).or_insert(0);
+        let process_result = process_message(record).await;
+
+        match process_result {
+            Ok(link_id) => {
+                let counter = clicks_by_id.entry(link_id).or_insert(0);
                 *counter += 1;
+            }
+            Err(e) => {
+                tracing::warn!("Skipping record due to processing error: {:?}", e);
             }
         }
     }
@@ -36,6 +42,11 @@ pub(crate) async fn function_handler<R: UrlRepository>(
     // Update click counts in the repository (concurrently)
     let mut update_futures = vec![];
     for (link_id, click_count) in clicks_by_id {
+        link_clicked_counter.add(
+            click_count,
+            &[opentelemetry::KeyValue::new("link_id", link_id.clone())],
+        );
+        
         let repo = &deps.url_repo;
         update_futures.push(async move {
             match repo.increment_clicks(&link_id, click_count).await {
@@ -59,6 +70,42 @@ pub(crate) async fn function_handler<R: UrlRepository>(
     futures::future::join_all(update_futures).await;
 
     Ok(())
+}
+
+#[tracing::instrument("process link_clicked.v1", skip(record), fields(
+    messaging.message.id = tracing::field::Empty,
+    messaging.operation.name = "process",
+    messaging.destination = "aws_kinesis",
+    messaging.client.id = "process_link_clicked",
+))]
+async fn process_message(
+    record: KinesisEventRecord,
+) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    let kinesis_record = record.kinesis;
+    let data = kinesis_record.data.as_ref();
+
+    let current_span = tracing::Span::current();
+    let cloud_event: cloudevents::Event = match serde_json::from_slice(data) {
+        Ok(event) => event,
+        Err(e) => {
+            tracing::error!("Failed to deserialize CloudEvent: {:?}", e);
+            return Err(Box::new(e));
+        }
+    };
+
+    tracing::Span::current().record("messaging.message.id", &cloud_event.id().to_string());
+
+    add_span_link_from(&current_span, &cloud_event);
+
+    let cloud_event_data = cloud_event.data().ok_or("CloudEvent has no data")?;
+
+    let link_click_event: ShortUrl = match cloud_event_data {
+        cloudevents::Data::Binary(items) => serde_json::from_slice(items)?,
+        cloudevents::Data::String(string_data) => serde_json::from_str(&string_data)?,
+        cloudevents::Data::Json(value) => serde_json::from_value(value.clone())?,
+    };
+
+    Ok(link_click_event.link_id)
 }
 
 #[cfg(test)]
