@@ -1,6 +1,6 @@
 use aws_lambda_events::{
     event::sqs::SqsEvent,
-    sqs::{BatchItemFailure, SqsBatchResponse, SqsMessage},
+    sqs::{SqsBatchResponse, SqsMessage},
 };
 use lambda_runtime::{Error, LambdaEvent};
 
@@ -14,11 +14,7 @@ pub async fn function_handler(event: LambdaEvent<SqsEvent>) -> Result<SqsBatchRe
         if let Err(e) = process_record(&record).await {
             println!("Failed to process message {}: {}", message_id, e);
             // Add to failures list so it will be retried
-            let mut batch_item_failure = BatchItemFailure::default();
-            batch_item_failure.item_identifier = message_id.clone();
-            sqs_batch_response
-                .batch_item_failures
-                .push(batch_item_failure);
+            sqs_batch_response.add_failure(message_id);
         }
     }
 

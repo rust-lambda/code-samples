@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 shared = { path = "../../shared" }
-aws_lambda_events = { version = "1.0.0", default-features = false, features = [
+aws_lambda_events = { version = "1.0.3", default-features = false, features = [
   "kinesis",
 ] }
 lambda_runtime = "1.0.1"

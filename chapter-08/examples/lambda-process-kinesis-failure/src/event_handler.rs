@@ -1,7 +1,7 @@
 use aws_lambda_events::{
     event::kinesis::KinesisEvent,
     kinesis::KinesisEventRecord,
-    streams::{KinesisBatchItemFailure, KinesisEventResponse},
+    streams::KinesisEventResponse,
 };
 use lambda_runtime::{Error, LambdaEvent};
 use serde::Deserialize;
@@ -26,9 +26,7 @@ pub async fn function_handler(
             }
             Err(e) => {
                 eprintln!("Failed to process order: {:?}", e);
-                let mut failure = KinesisBatchItemFailure::default();
-                failure.item_identifier = Some(record.kinesis.sequence_number);
-                response.batch_item_failures.push(failure);
+                response.add_failure(&record.kinesis.sequence_number);
             }
         }
     }
