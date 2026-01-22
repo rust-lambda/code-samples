@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+shared = { path = "../../shared" }
+
 aws_lambda_events = { version = "1.0.0", default-features = false, features = [
   "sqs",
 ] }
@@ -11,3 +13,7 @@ serde_json = "1.0"
 serde = "1.0.228"
 lambda_runtime = "1.0.1"
 tokio = { version = "1", features = ["macros"] }
+cloudevents-sdk = "0.9.0"
+
+opentelemetry = "0.31.0"
+tracing = "0.1.43"
