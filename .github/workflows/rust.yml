@@ -72,4 +72,6 @@ jobs:
         working-directory: ${{ matrix.project }}
       - name: Run tests
         run: cargo test --verbose
+        env:
+          ENV: test
         working-directory: ${{ matrix.project }}
