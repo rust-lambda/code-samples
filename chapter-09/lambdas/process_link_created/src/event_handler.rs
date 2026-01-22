@@ -1,6 +1,6 @@
 use aws_lambda_events::{
     event::sqs::SqsEvent,
-    sqs::{BatchItemFailure, SqsBatchResponse, SqsMessage},
+    sqs::{SqsBatchResponse, SqsMessage},
 };
 use cloudevents::AttributesReader;
 use lambda_runtime::{tracing, Error, LambdaEvent};
@@ -35,24 +35,22 @@ pub(crate) async fn function_handler<R: UrlRepository, I: UrlInfo>(
         .collect();
     let results = futures::future::join_all(tasks).await; // Run tasks concurrently
 
-    let failure_items = results
+    let failure_ids: Vec<String> = results
         .into_iter()
         .zip(payload.records.into_iter())
         .filter_map(|(result, message)| {
             if let Err(e) = result {
                 tracing::error!("Failed to process message {:?}: {}", message.message_id, e);
-                let mut failure_item = BatchItemFailure::default();
-                failure_item.item_identifier = message.message_id.unwrap_or_default();
-                Some(failure_item)
+                Some(message.message_id.unwrap_or_default())
             } else {
                 None
             }
         })
-        .collect::<Vec<BatchItemFailure>>();
+        .collect();
 
-    link_created_counter.add(batch_count as u64 - failure_items.len() as u64, &[]);
+    link_created_counter.add(batch_count as u64 - failure_ids.len() as u64, &[]);
 
-    sqs_batch_response.batch_item_failures = failure_items;
+    sqs_batch_response.set_failures(failure_ids);
     Ok(sqs_batch_response)
 }
 
