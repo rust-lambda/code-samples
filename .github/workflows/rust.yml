@@ -37,6 +37,32 @@ jobs:
           - "chapter-07/02-lambda-extension/lambdas/get_links"
           - "chapter-07/02-lambda-extension/lambdas/visit_link"
           - "chapter-07/02-lambda-extension/shared"
+          - "chapter-08/examples/sqs-sendmessage"
+          - "chapter-08/examples/sqs-sendmessage-structured"
+          - "chapter-08/examples/lambda-process-sqs"
+          - "chapter-08/examples/lambda-process-sqs-failure"
+          - "chapter-08/examples/eventbridge-putevents"
+          - "chapter-08/examples/eventbridge-putevents-multiple"
+          - "chapter-08/examples/lambda-process-eventbridge"
+          - "chapter-08/examples/kinesis-publish-records"
+          - "chapter-08/examples/lambda-process-kinesis"
+          - "chapter-08/examples/lambda-process-kinesis-failure"
+          - "chapter-08/lambdas/create_link"
+          - "chapter-08/lambdas/get_links"
+          - "chapter-08/lambdas/visit_link"
+          - "chapter-08/lambdas/process_link_created"
+          - "chapter-08/lambdas/process_link_clicked"
+          - "chapter-08/shared"
+          - "chapter-09/examples/lambda-process-sqs"
+          - "chapter-09/examples/otel-simple"
+          - "chapter-09/examples/sqs-receive-traced-message"
+          - "chapter-09/examples/sqs-send-traced-message"
+          - "chapter-09/lambdas/create_link"
+          - "chapter-09/lambdas/get_links"
+          - "chapter-09/lambdas/visit_link"
+          - "chapter-09/lambdas/process_link_created"
+          - "chapter-09/lambdas/process_link_clicked"
+          - "chapter-09/shared"
       fail-fast: false
 
     steps:
@@ -46,4 +72,6 @@ jobs:
         working-directory: ${{ matrix.project }}
       - name: Run tests
         run: cargo test --verbose
+        env:
+          ENV: test
         working-directory: ${{ matrix.project }}

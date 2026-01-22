@@ -27,8 +27,10 @@ async fn when_valid_link_is_passed_should_retrieve_info_and_store() {
 
     assert_eq!(response.status(), 200);
 
-    let response_data: ShortUrl =
-        serde_json::from_str(response.text().await.unwrap().as_str()).expect("Response to be a JSON string that successfully deserializes to a `ShortUrl` struct");
+    let response_data: ShortUrl = serde_json::from_str(response.text().await.unwrap().as_str())
+        .expect(
+            "Response to be a JSON string that successfully deserializes to a `ShortUrl` struct",
+        );
 
     assert_eq!(response_data.original_link, "https://google.com");
 
@@ -40,7 +42,6 @@ async fn when_valid_link_is_passed_should_retrieve_info_and_store() {
 
     assert_eq!(redirect_response.status(), 302);
 }
-
 
 #[tokio::test]
 async fn when_invalid_body_is_passed_application_should_return_400_error() {
@@ -69,8 +70,9 @@ async fn when_invalid_body_is_passed_application_should_return_400_error() {
 async fn retrieve_api_endpoint() -> String {
     let config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
     let cloudformation_client = aws_sdk_cloudformation::Client::new(&config);
-    let stack_name = env::var("STACK_NAME").unwrap_or("rust-link-shorten".to_string());
-    let env = env::var("ENV").expect("The current environment should be set using the 'ENV' environment variable");
+    let stack_name = env::var("STACK_NAME").unwrap_or("LinkShortener-dev".to_string());
+    let env = env::var("ENV")
+        .expect("The current environment should be set using the 'ENV' environment variable");
 
     let get_stacks = cloudformation_client
         .describe_stacks()
@@ -79,11 +81,21 @@ async fn retrieve_api_endpoint() -> String {
         .await
         .expect(format!("CloudFormation stack named {} should exist", stack_name).as_str());
 
-    let outputs = get_stacks.stacks.expect("Get stack request should return an array")[0].clone().outputs.expect("The first stack in the get stacks response should have outputs");
+    let outputs = get_stacks
+        .stacks
+        .expect("Get stack request should return an array")[0]
+        .clone()
+        .outputs
+        .expect("The first stack in the get stacks response should have outputs");
     let api_outputs: Vec<Output> = outputs
         .into_iter()
-        .filter(|output| output.export_name.clone().unwrap() == format!("UrlShortenerEndpoint-{}", env))
+        .filter(|output| {
+            output.export_name.clone().unwrap() == format!("UrlShortenerEndpoint-{}", env)
+        })
         .collect();
 
-    api_outputs[0].clone().output_value.expect("CloudFormation stack should have an output named `UrlShortenerEndpoint`")
+    api_outputs[0]
+        .clone()
+        .output_value
+        .expect("CloudFormation stack should have an output named `UrlShortenerEndpoint`")
 }

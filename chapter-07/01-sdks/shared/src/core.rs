@@ -1,4 +1,4 @@
-use crate::{configuration::Configuration, url_info::UrlDetails};
+use crate::url_info::UrlDetails;
 use async_trait::async_trait;
 use cuid2::CuidConstructor;
 use serde::{Deserialize, Serialize};
@@ -15,10 +15,7 @@ pub struct ShortenUrlRequest {
 #[cfg_attr(any(test, feature = "mocks"), automock)]
 #[async_trait]
 pub trait UrlRepository: Debug {
-    async fn get_url_from_short_link(
-        &self,
-        short_link: &str,
-    ) -> Result<Option<String>, String>;
+    async fn get_url_from_short_link(&self, short_link: &str) -> Result<Option<String>, String>;
     async fn store_short_url(
         &self,
         url_to_shorten: String,
@@ -84,10 +81,7 @@ impl<R: UrlRepository, I: UrlInfo> UrlShortener<R, I> {
         Self { url_repo, url_info }
     }
 
-    pub async fn shorten_url(
-        &self,
-        req: ShortenUrlRequest,
-    ) -> Result<ShortUrl, String> {
+    pub async fn shorten_url(&self, req: ShortenUrlRequest) -> Result<ShortUrl, String> {
         let short_url = self.generate_short_url();
         let url_details = self
             .url_info
@@ -96,7 +90,7 @@ impl<R: UrlRepository, I: UrlInfo> UrlShortener<R, I> {
             .unwrap_or_default();
 
         self.url_repo
-            .store_short_url( req.url_to_shorten.clone(), short_url, url_details)
+            .store_short_url(req.url_to_shorten.clone(), short_url, url_details)
             .await
     }
 
@@ -104,15 +98,14 @@ impl<R: UrlRepository, I: UrlInfo> UrlShortener<R, I> {
         &self,
         link_id: &str,
     ) -> Result<Option<String>, String> {
-        self.url_repo.get_url_from_short_link( link_id).await
+        self.url_repo.get_url_from_short_link(link_id).await
     }
 
     pub async fn list_urls(
         &self,
         last_evaluated_id: Option<String>,
     ) -> Result<ListShortUrlsResponse, String> {
-        let (short_urls, last_evaluated_id) =
-            self.url_repo.list_urls(last_evaluated_id).await?;
+        let (short_urls, last_evaluated_id) = self.url_repo.list_urls(last_evaluated_id).await?;
 
         Ok(ListShortUrlsResponse {
             short_urls,
@@ -199,7 +192,7 @@ mod tests {
         let mut url_repo = MockUrlRepository::new();
         url_repo
             .expect_get_url_from_short_link()
-            .with(predicate::eq(test_short_url.to_string()))
+            .with(predicate::eq(test_short_url))
             .times(1)
             .returning(|_url_to_shorten| Ok(Some("https://google.com".to_string())));
 
@@ -224,7 +217,7 @@ mod tests {
         let mut url_repo = MockUrlRepository::new();
         url_repo
             .expect_get_url_from_short_link()
-            .with(predicate::eq(test_short_url.to_string()))
+            .with(predicate::eq(test_short_url))
             .times(1)
             .returning(|_url_to_shorten| Err("Not found".to_string()));
 

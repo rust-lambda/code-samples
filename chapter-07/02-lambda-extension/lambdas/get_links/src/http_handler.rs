@@ -48,7 +48,10 @@ mod tests {
         let mut mock_url_repo = MockUrlRepository::default();
         let mock_url_info = MockUrlInfo::default();
         let mut mock_configuration_manager = MockConfig::default();
-        mock_configuration_manager.expect_refresh().times(1).returning(|| Configuration::default());
+        mock_configuration_manager
+            .expect_refresh()
+            .times(1)
+            .returning(|| Configuration::default());
 
         mock_url_repo
             .expect_list_urls()
@@ -84,12 +87,18 @@ mod tests {
         let mut mock_url_repo = MockUrlRepository::default();
         let mock_url_info = MockUrlInfo::default();
         let mut mock_configuration_manager = MockConfig::default();
-        mock_configuration_manager.expect_refresh().times(1).returning(|| Configuration::default());
+        mock_configuration_manager
+            .expect_refresh()
+            .times(1)
+            .returning(|| Configuration::default());
 
         mock_url_repo
             .expect_list_urls()
             .times(1)
-            .with(predicate::always(), predicate::eq(Some("an-id".to_string()))) // make sure the correct id is propagated
+            .with(
+                predicate::always(),
+                predicate::eq(Some("an-id".to_string())),
+            ) // make sure the correct id is propagated
             .returning(|_, _last_evaluated_id| {
                 Ok((
                     vec![ShortUrl::new(
@@ -124,7 +133,10 @@ mod tests {
         let mut mock_url_repo = MockUrlRepository::default();
         let mock_url_info = MockUrlInfo::default();
         let mut mock_configuration_manager = MockConfig::default();
-        mock_configuration_manager.expect_refresh().times(1).returning(|| Configuration::default());
+        mock_configuration_manager
+            .expect_refresh()
+            .times(1)
+            .returning(|| Configuration::default());
 
         mock_url_repo
             .expect_list_urls()

@@ -191,20 +191,18 @@ impl UrlShortener {
             .await
             .map_err(|e| format!("Error executing scan: {:?}", e))?;
 
-        let mut short_urls = vec![];
-        if let Some(items) = result.items {
-            for item in items {
-                // ignore item that cannot be properly deserialized
-                if let Ok(short_url) = ShortUrl::try_from(item) {
-                    short_urls.push(short_url);
-                }
-            }
-        }
+        let short_urls: Vec<ShortUrl> = result
+            .items
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|item| ShortUrl::try_from(item).ok())
+            .collect();
+
         let last_evaluated_id = result
             .last_evaluated_key
             .unwrap_or_default()
             .get("LinkId")
-            .map(|s| s.as_s().unwrap().to_string());
+            .and_then(|s| s.as_s().ok().map(|v| v.to_string()));
 
         Ok(ListShortUrlsResponse {
             short_urls,

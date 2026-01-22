@@ -53,7 +53,10 @@ mod tests {
         let mut mock_url_repo = MockUrlRepository::default();
         let mut mock_url_info = MockUrlInfo::default();
         let mut mock_configuration_manager = MockConfig::default();
-        mock_configuration_manager.expect_refresh().times(1).returning(|| Configuration::default());
+        mock_configuration_manager
+            .expect_refresh()
+            .times(1)
+            .returning(|| Configuration::default());
 
         mock_url_repo.expect_store_short_url().times(1).returning(
             |_, url_to_shorten, _short_url, url_details| {
@@ -111,7 +114,10 @@ mod tests {
         let mock_url_repo = MockUrlRepository::default();
         let mock_url_info = MockUrlInfo::default();
         let mut mock_configuration_manager = MockConfig::default();
-        mock_configuration_manager.expect_refresh().times(1).returning(|| Configuration::default());
+        mock_configuration_manager
+            .expect_refresh()
+            .times(1)
+            .returning(|| Configuration::default());
 
         let url_shortener = UrlShortener::new(mock_url_repo, mock_url_info);
         let request = Request::builder().body(Body::Empty).unwrap();
@@ -127,7 +133,10 @@ mod tests {
         let mut mock_url_repo = MockUrlRepository::default();
         let mut mock_url_info = MockUrlInfo::default();
         let mut mock_configuration_manager = MockConfig::default();
-        mock_configuration_manager.expect_refresh().times(1).returning(|| Configuration::default());
+        mock_configuration_manager
+            .expect_refresh()
+            .times(1)
+            .returning(|| Configuration::default());
 
         mock_url_repo.expect_store_short_url().times(1).returning(
             |_, _url_to_shorten, _short_url, _url_details| Err("Error storing URL".to_string()),

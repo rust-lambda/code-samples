@@ -7,19 +7,29 @@ use serde::{Deserialize, Serialize};
 // you would typically use a LogLevel that comes from a logging crate.
 // you'll see that in the chapter on observability
 #[derive(Default, Debug, Serialize, Deserialize)]
-enum LogLevel {
-    TRACE,
+pub enum LogLevel {
+    Trace,
     #[default]
-    INFO,
-    WARN,
-    ERROR,
+    Info,
+    Warn,
+    Error,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Configuration {
     pub table_name: String,
     pub log_level: LogLevel,
     pub api_key: String,
+}
+
+impl Default for Configuration {
+    fn default() -> Configuration {
+        Configuration {
+            table_name: "".to_string(),
+            log_level: LogLevel::Info,
+            api_key: "".to_string(),
+        }
+    }
 }
 
 impl Configuration {
@@ -37,9 +47,7 @@ impl Configuration {
         let secret_manager_configuration =
             Configuration::load_from_secret_manager(secret_client).await;
         config = match secret_manager_configuration {
-            Ok(secret_config) => config
-                // .join overrides any existing values with new values from this JSON
-                .join(Json::string(&secret_config)),
+            Ok(secret_config) => config.join(Json::string(&secret_config)),
             Err(_) => config,
         };
 
@@ -47,7 +55,7 @@ impl Configuration {
 
         match config {
             Ok(config) => {
-                println!("{}", config);
+                println!("{:?}", config);
                 config
             }
             Err(e) => {
@@ -67,7 +75,7 @@ impl Configuration {
                 String::new()
             }
         };
-        if configuration_ssm_parameter_name.len() > 0 {
+        if !configuration_ssm_parameter_name.is_empty() {
             let ssm_configuration = ssm_client
                 .get_parameter()
                 .name(configuration_ssm_parameter_name)
@@ -93,7 +101,7 @@ impl Configuration {
             Ok(name) => name,
             Err(_) => String::new(),
         };
-        if configuration_secret_id.len() > 0 {
+        if !configuration_secret_id.is_empty() {
             let secret_value = secret_client
                 .get_secret_value()
                 .secret_id(configuration_secret_id)
@@ -113,7 +121,7 @@ impl Configuration {
 impl std::fmt::Display for Configuration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.log_level {
-            LogLevel::TRACE | LogLevel::INFO => write!(
+            LogLevel::Trace | LogLevel::Info => write!(
                 f,
                 "Configuration {{ table_name: {}, log_level: {:?}, api_key: {:?} }}",
                 self.table_name, self.log_level, self.api_key
@@ -137,17 +145,18 @@ mod tests {
         figment::Jail::expect_with(|jail| {
             jail.set_env("APP_TABLE_NAME", "james-test-table");
 
-            let config: Configuration = Figment::from(Serialized::defaults(Configuration::default()))
-                .merge(Env::prefixed("APP_"))
-                .merge(Json::string(stringify!({
-                    "log_level": "INFO",
-                    "api_key": "test-api-key"
-                })))
-                .extract()
-                .unwrap();
+            let config: Configuration =
+                Figment::from(Serialized::defaults(Configuration::default()))
+                    .merge(Env::prefixed("APP_"))
+                    .merge(Json::string(stringify!({
+                        "log_level": "Info",
+                        "api_key": "test-api-key"
+                    })))
+                    .extract()
+                    .unwrap();
 
             assert_eq!(config.table_name, "james-test-table");
-            assert!(matches!(config.log_level, LogLevel::INFO));
+            assert!(matches!(config.log_level, LogLevel::Info));
 
             Ok(())
         });
@@ -158,16 +167,17 @@ mod tests {
         figment::Jail::expect_with(|jail| {
             jail.set_env("APP_TABLE_NAME", "james-test-table");
 
-            let config: Configuration = Figment::from(Serialized::defaults(Configuration::default()))
-                .merge(Env::prefixed("APP_"))
-                .merge(Json::string(stringify!({
-                    "api_key": "test-api-key"
-                })))
-                .extract()
-                .unwrap();
+            let config: Configuration =
+                Figment::from(Serialized::defaults(Configuration::default()))
+                    .merge(Env::prefixed("APP_"))
+                    .merge(Json::string(stringify!({
+                        "api_key": "test-api-key"
+                    })))
+                    .extract()
+                    .unwrap();
 
             assert_eq!(config.table_name, "james-test-table");
-            assert!(matches!(config.log_level, LogLevel::INFO));
+            assert!(matches!(config.log_level, LogLevel::Info));
             assert_eq!(config.api_key, "test-api-key");
 
             Ok(())

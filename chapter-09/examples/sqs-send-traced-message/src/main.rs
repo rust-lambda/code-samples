@@ -33,7 +33,7 @@ async fn run_message_sender() {
 
     let message_body = serde_json::to_string(&message).expect("Failed to serialize message");
 
-    let event: cloudevents::Event = EventBuilderV10::new()
+    let event = EventBuilderV10::new()
         .id(CuidGenerator::new().generate_id().to_string())
         .ty("scrape_link_message.v1")
         .source("http://dev.example.com")
@@ -43,7 +43,8 @@ async fn run_message_sender() {
         .map_err(|e| {
             tracing::error!("Failed to build CloudEvent: {}", e);
             e
-        })?;
+        })
+        .unwrap();
 
     publish_message(&event).await;
 }
