@@ -12,8 +12,7 @@ struct OrderEvent {
 
 #[tokio::main]
 async fn main() {
-    let stream_name = env::var("STREAM_NAME")
-        .expect("STREAM_NAME is not set");
+    let stream_name = env::var("STREAM_NAME").expect("STREAM_NAME is not set");
 
     let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
     let kinesis_client = aws_sdk_kinesis::Client::new(&config);

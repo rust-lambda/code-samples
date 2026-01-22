@@ -16,12 +16,12 @@ pub trait Config {
 // you would typically use a LogLevel that comes from a logging crate.
 // you'll see that in the chapter on observability
 #[derive(Default, Debug, Serialize, Deserialize)]
-pub(crate) enum LogLevel {
-    TRACE,
+pub enum LogLevel {
+    Trace,
     #[default]
-    INFO,
-    WARN,
-    ERROR,
+    Info,
+    Warn,
+    Error,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
@@ -68,7 +68,7 @@ impl ConfigurationManager {
 
         match config {
             Ok(config) => {
-                println!("{}", config);
+                println!("{:?}", config);
                 config
             }
             Err(e) => {
@@ -183,7 +183,7 @@ impl Config for ConfigurationManager {
 impl std::fmt::Display for Configuration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.log_level {
-            LogLevel::TRACE | LogLevel::INFO => write!(
+            LogLevel::Trace | LogLevel::Info => write!(
                 f,
                 "Configuration {{ table_name: {}, log_level: {:?}, api_key: {:?} }}",
                 self.table_name, self.log_level, self.api_key
@@ -210,7 +210,7 @@ mod tests {
             let config: Configuration = Figment::new()
                 .merge(Env::prefixed("APP_"))
                 .merge(Json::string(stringify!({
-                    "log_level": "INFO"
+                    "log_level": "Info"
                 })))
                 .merge(Json::string(stringify!({
                     "api_key": "my-test-api-key"
@@ -219,7 +219,7 @@ mod tests {
                 .unwrap();
 
             assert_eq!(config.table_name, "james-test-table");
-            assert!(matches!(config.log_level, LogLevel::INFO));
+            assert!(matches!(config.log_level, LogLevel::Info));
 
             Ok(())
         });
@@ -234,14 +234,14 @@ mod tests {
                 .merge(Env::prefixed("APP_"))
                 .merge(Json::string(stringify!({
                     "table_name": "james-test-table-override",
-                    "log_level": "ERROR",
+                    "log_level": "Error",
                     "api_key": "my-test"
                 })))
                 .extract()
                 .unwrap();
 
             assert_eq!(config.table_name, "james-test-table-override");
-            assert!(matches!(config.log_level, LogLevel::ERROR));
+            assert!(matches!(config.log_level, LogLevel::Error));
 
             Ok(())
         });
@@ -252,13 +252,14 @@ mod tests {
         figment::Jail::expect_with(|jail| {
             jail.set_env("APP_TABLE_NAME", "james-test-table");
 
-            let config: Configuration = Figment::from(Serialized::defaults(Configuration::default()))
-                .extract()
-                .unwrap();
+            let config: Configuration =
+                Figment::from(Serialized::defaults(Configuration::default()))
+                    .extract()
+                    .unwrap();
 
             assert_eq!(config.table_name, "");
             assert_eq!(config.api_key, "");
-            assert!(matches!(config.log_level, LogLevel::INFO));
+            assert!(matches!(config.log_level, LogLevel::Info));
 
             Ok(())
         });

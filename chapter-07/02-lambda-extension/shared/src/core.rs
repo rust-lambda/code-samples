@@ -306,7 +306,7 @@ mod tests {
         let mut url_repo = MockUrlRepository::new();
         let configuration = Configuration {
             table_name: "test".to_string(),
-            log_level: LogLevel::INFO,
+            log_level: LogLevel::Info,
             api_key: "test".to_string(),
         };
 
