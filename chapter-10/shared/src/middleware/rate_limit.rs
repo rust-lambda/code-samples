@@ -535,6 +535,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn allows_exactly_max_requests_before_blocking() {
+        // Pins the limit semantic: max_requests = N means the first N requests
+        // succeed, and request N+1 is the first 429.
+        let max = 3u32;
+        let config = test_config(max);
+        let store: Arc<dyn RateLimitStore> = Arc::new(MockRateLimitStore::new());
+
+        for i in 1..=max {
+            let service = RateLimitService::with_store(
+                lambda_http::tower::service_fn(ok_handler),
+                Arc::clone(&store),
+                Arc::clone(&config),
+            );
+            let response = service
+                .oneshot(request_with_ip("203.0.113.3"))
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK, "request {i} should succeed");
+            assert_eq!(
+                response.headers().get("X-RateLimit-Remaining").unwrap(),
+                (max - i).to_string().as_str(),
+            );
+        }
+
+        let service =
+            RateLimitService::with_store(lambda_http::tower::service_fn(ok_handler), store, config);
+        let blocked = service
+            .oneshot(request_with_ip("203.0.113.3"))
+            .await
+            .unwrap();
+        assert_eq!(blocked.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(blocked.headers().get("X-RateLimit-Remaining").unwrap(), "0");
+    }
+
+    #[tokio::test]
     async fn different_ips_have_separate_counters() {
         let config = test_config(1);
         let store: Arc<dyn RateLimitStore> = Arc::new(MockRateLimitStore::new());
