@@ -1,8 +1,10 @@
 //! Per-IP rate-limiting middleware for Rust Lambda HTTP handlers.
 //!
-//! A fixed-window counter backed by DynamoDB. The primary key for each
-//! counter row is `"{ip}#{window_bucket}"` where `window_bucket = now / window_duration`.
-//! Rows carry a TTL so DynamoDB cleans them up for us.
+//! A fixed-window counter. The service identifies clients by IP and computes
+//! the current window bucket; the storage backend behind the
+//! [`RateLimitStore`] trait then decides how to persist counters. The default
+//! [`DynamoDbRateLimitStore`] keys each counter as `"{identifier}#{bucket}"`
+//! and lets DynamoDB TTL clean rows up.
 //!
 //! Response headers follow the GitHub / Twitter convention, with
 //! `Reset` carrying a Unix epoch second:
@@ -117,9 +119,14 @@ impl<S> Layer<S> for RateLimitLayer {
     type Service = RateLimitService<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        let store: Arc<dyn RateLimitStore> = Arc::new(DynamoDbRateLimitStore {
-            client: self.client.clone(),
-        });
+        let store: Arc<dyn RateLimitStore> = Arc::new(DynamoDbRateLimitStore::new(
+            self.client.clone(),
+            self.config.table_name.clone(),
+            self.config.window_duration,
+            // Keep counter rows for one extra window so late-arriving requests
+            // in the same bucket still observe a consistent counter.
+            self.config.window_duration,
+        ));
         RateLimitService {
             inner,
             store,
@@ -189,15 +196,12 @@ where
             let reset_at = bucket.saturating_add(1).saturating_mul(window);
             let seconds_until_reset = reset_at.saturating_sub(now);
 
-            let pk = format!("{ip}#{bucket}");
-            // Keep the row for one extra window so late-arriving requests in
-            // the same bucket still observe a consistent counter.
-            let ttl = reset_at.saturating_add(window);
+            let identifier = ip.to_string();
 
-            let count = match store.increment_and_get(&config.table_name, &pk, ttl).await {
+            let count = match store.increment_and_get(&identifier, bucket).await {
                 Ok(c) => c,
                 Err(e) => {
-                    tracing::error!(ip = %ip, window = bucket, error = %e, "rate_limit: DynamoDB error");
+                    tracing::error!(ip = %ip, window = bucket, error = %e, "rate_limit: store error");
                     // Fail closed: build the default 503, then let the
                     // configurable hook tweak it before sending.
                     let pre_built = build_unavailable_response();
@@ -305,44 +309,66 @@ fn default_unavailable(_request: &Request<Body>, response: Response<Body>) -> Re
 trait RateLimitStore: Send + Sync {
     async fn increment_and_get(
         &self,
-        table_name: &str,
-        pk: &str,
-        ttl: u64,
+        identifier: &str,
+        bucket: u64,
     ) -> Result<u32, RateLimitStoreError>;
 }
 
 #[derive(Debug, thiserror::Error)]
 enum RateLimitStoreError {
-    #[error("DynamoDB error: {0}")]
-    DynamoDb(String),
+    #[error("rate-limit store error: {0}")]
+    Backend(String),
 }
 
 struct DynamoDbRateLimitStore {
     client: aws_sdk_dynamodb::Client,
+    table_name: String,
+    bucket_size: Duration,
+    retention: Duration,
+}
+
+impl DynamoDbRateLimitStore {
+    fn new(
+        client: aws_sdk_dynamodb::Client,
+        table_name: String,
+        bucket_size: Duration,
+        retention: Duration,
+    ) -> Self {
+        Self {
+            client,
+            table_name,
+            bucket_size,
+            retention,
+        }
+    }
 }
 
 #[async_trait::async_trait]
 impl RateLimitStore for DynamoDbRateLimitStore {
     async fn increment_and_get(
         &self,
-        table_name: &str,
-        pk: &str,
-        ttl: u64,
+        identifier: &str,
+        bucket: u64,
     ) -> Result<u32, RateLimitStoreError> {
+        let bucket_size = self.bucket_size.as_secs().max(1);
+        let reset_at = bucket.saturating_add(1).saturating_mul(bucket_size);
+        let expires_at = reset_at.saturating_add(self.retention.as_secs());
+        let pk = format!("{identifier}#{bucket}");
+
         let result = self
             .client
             .update_item()
-            .table_name(table_name)
-            .key("pk", AttributeValue::S(pk.to_string()))
+            .table_name(&self.table_name)
+            .key("pk", AttributeValue::S(pk))
             .update_expression("ADD #calls :one SET #ttl = if_not_exists(#ttl, :ttl_val)")
             .expression_attribute_names("#calls", "calls")
             .expression_attribute_names("#ttl", "ttl")
             .expression_attribute_values(":one", AttributeValue::N("1".to_string()))
-            .expression_attribute_values(":ttl_val", AttributeValue::N(ttl.to_string()))
+            .expression_attribute_values(":ttl_val", AttributeValue::N(expires_at.to_string()))
             .return_values(aws_sdk_dynamodb::types::ReturnValue::UpdatedNew)
             .send()
             .await
-            .map_err(|e| RateLimitStoreError::DynamoDb(e.to_string()))?;
+            .map_err(|e| RateLimitStoreError::Backend(e.to_string()))?;
 
         let count = result
             .attributes()
@@ -350,7 +376,7 @@ impl RateLimitStore for DynamoDbRateLimitStore {
             .and_then(|v| v.as_n().ok())
             .and_then(|n| n.parse::<u32>().ok())
             .ok_or_else(|| {
-                RateLimitStoreError::DynamoDb(
+                RateLimitStoreError::Backend(
                     "missing or invalid 'calls' attribute in UpdateItem response".to_string(),
                 )
             })?;
@@ -382,25 +408,26 @@ mod tests {
     use lambda_http::request::RequestContext;
     use lambda_http::tower::ServiceExt;
     use lambda_http::RequestExt;
+    use std::collections::HashMap;
     use std::convert::Infallible;
     use std::sync::Mutex;
 
     struct MockRateLimitStore {
-        counters: Mutex<std::collections::HashMap<String, u32>>,
+        counters: Mutex<HashMap<(String, u64), u32>>,
         fail: bool,
     }
 
     impl MockRateLimitStore {
         fn new() -> Self {
             Self {
-                counters: Mutex::new(std::collections::HashMap::new()),
+                counters: Mutex::new(HashMap::new()),
                 fail: false,
             }
         }
 
         fn failing() -> Self {
             Self {
-                counters: Mutex::new(std::collections::HashMap::new()),
+                counters: Mutex::new(HashMap::new()),
                 fail: true,
             }
         }
@@ -410,15 +437,16 @@ mod tests {
     impl RateLimitStore for MockRateLimitStore {
         async fn increment_and_get(
             &self,
-            _table_name: &str,
-            pk: &str,
-            _ttl: u64,
+            identifier: &str,
+            bucket: u64,
         ) -> Result<u32, RateLimitStoreError> {
             if self.fail {
-                return Err(RateLimitStoreError::DynamoDb("mock failure".to_string()));
+                return Err(RateLimitStoreError::Backend("mock failure".to_string()));
             }
             let mut counters = self.counters.lock().unwrap();
-            let count = counters.entry(pk.to_string()).or_insert(0);
+            let count = counters
+                .entry((identifier.to_string(), bucket))
+                .or_insert(0);
             *count += 1;
             Ok(*count)
         }
@@ -544,7 +572,8 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
-        // Default 503 deliberately omits Retry-After; users can add one via on_unavailable.
+        // Retry-After only makes sense on 429, where the window reset gives us
+        // an honest hint; the 503 omits it because the store's recovery time is unknown.
         assert!(!response.headers().contains_key("Retry-After"));
     }
 
