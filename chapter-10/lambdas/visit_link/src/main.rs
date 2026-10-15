@@ -1,20 +1,16 @@
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use std::sync::Arc;
 
 use crate::config::Config;
 use crate::http_handler::HandlerDeps;
 use http_handler::function_handler;
-use lambda_http::{run, service_fn, Error};
+use lambda_http::tower::ServiceBuilder;
+use lambda_http::{http, run, service_fn, Body, Error};
 use shared::adapters::DynamoDbUrlRepository;
-use tracing::Instrument;
+use shared::middleware::observability::HttpObservabilityLayer;
 
 mod config;
 mod event_publisher;
 mod http_handler;
-
-static IS_COLD_START: AtomicBool = AtomicBool::new(true);
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -27,29 +23,18 @@ async fn main() -> Result<(), Error> {
     let url_repo = DynamoDbUrlRepository::new(config.table_name, dynamodb_client);
     let event_publisher =
         event_publisher::KinesisEventPublisher::new(kinesis_client, config.stream_name);
-    let deps = HandlerDeps {
+    let observability_layer = HttpObservabilityLayer::new(Arc::clone(&otel_guard));
+    let deps = Arc::new(HandlerDeps {
         url_repo,
         event_publisher,
-    };
+    });
 
-    run(service_fn(|event| async {
-        let was_cold_start = IS_COLD_START.swap(false, Ordering::SeqCst);
+    let service = ServiceBuilder::new()
+        .layer(observability_layer)
+        .service(service_fn(move |event: http::Request<Body>| {
+            let deps = Arc::clone(&deps);
+            async move { function_handler(deps.as_ref(), event).await }
+        }));
 
-        let handler_span = tracing::info_span!(
-            "aws.lambda",
-            operation_name = "aws.lambda",
-            faas.coldstart = was_cold_start,
-            cloud.provider = "aws",
-            event_type = "http"
-        );
-
-        let res = function_handler(&deps, event)
-            .instrument(handler_span)
-            .await;
-
-        otel_guard.flush();
-
-        res
-    }))
-    .await
+    run(service).await
 }

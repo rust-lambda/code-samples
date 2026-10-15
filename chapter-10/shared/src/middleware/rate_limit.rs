@@ -552,7 +552,11 @@ mod tests {
                 .oneshot(request_with_ip("203.0.113.3"))
                 .await
                 .unwrap();
-            assert_eq!(response.status(), StatusCode::OK, "request {i} should succeed");
+            assert_eq!(
+                response.status(),
+                StatusCode::OK,
+                "request {i} should succeed"
+            );
             assert_eq!(
                 response.headers().get("X-RateLimit-Remaining").unwrap(),
                 (max - i).to_string().as_str(),
