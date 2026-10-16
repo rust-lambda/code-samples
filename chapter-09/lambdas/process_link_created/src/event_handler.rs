@@ -121,9 +121,20 @@ mod tests {
     };
 
     fn create_sqs_message(message_id: &str, body: Option<String>) -> SqsMessage {
+        use cloudevents::{EventBuilder, EventBuilderV10};
+
         let mut message = SqsMessage::default();
         message.message_id = Some(message_id.to_string());
-        message.body = body;
+        message.body = body.map(|data| {
+            let cloud_event: cloudevents::Event = EventBuilderV10::new()
+                .id(message_id)
+                .ty("rust-link-shortener")
+                .source("http://rust-link-shortener.com")
+                .data("application/json", data.into_bytes())
+                .build()
+                .expect("Failed to create CloudEvent");
+            serde_json::to_string(&cloud_event).expect("Failed to serialise CloudEvent")
+        });
         message
     }
 

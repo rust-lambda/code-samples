@@ -11,7 +11,7 @@ pub struct Configuration {
 impl Configuration {
     pub async fn load(ssm_client: &Client, secret_client: &aws_sdk_secretsmanager::Client) -> Self {
         let mut config = Figment::from(Serialized::defaults(Configuration::default()))
-            // .merge fills in any missing values from the environment
+            // .merge overrides any existing values with new values from the environment
             .merge(Env::prefixed("APP_"));
 
         let ssm_configuration = Configuration::load_from_ssm(ssm_client).await;
@@ -24,8 +24,8 @@ impl Configuration {
             Configuration::load_from_secret_manager(secret_client).await;
         config = match secret_manager_configuration {
             Ok(secret_config) => config
-                // .join overrides any existing values with new values from this JSON
-                .join(Json::string(&secret_config)),
+                // .merge overrides any existing values with new values from this JSON
+                .merge(Json::string(&secret_config)),
             Err(_) => config,
         };
 
@@ -137,7 +137,7 @@ mod tests {
 
             let config: Configuration = Figment::new()
                 .merge(Env::prefixed("APP_"))
-                .join(Json::string(stringify!({
+                .merge(Json::string(stringify!({
                     "table_name": "james-test-table-override",
                     "log_level": "ERROR"
                 })))

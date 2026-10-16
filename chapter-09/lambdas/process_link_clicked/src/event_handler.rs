@@ -119,7 +119,16 @@ mod tests {
 
     fn create_kinesis_record(data: &str) -> KinesisEventRecord {
         use base64::{engine::general_purpose::STANDARD, Engine};
-        let encoded_data = STANDARD.encode(data);
+        use cloudevents::{EventBuilder, EventBuilderV10};
+
+        let cloud_event: cloudevents::Event = EventBuilderV10::new()
+            .id("test-event-id")
+            .ty("rust-link-shortener")
+            .source("http://rust-link-shortener.com")
+            .data("application/json", data.as_bytes().to_vec())
+            .build()
+            .expect("Failed to create CloudEvent");
+        let encoded_data = STANDARD.encode(serde_json::to_vec(&cloud_event).unwrap());
 
         let record_json = json!({
             "kinesis": {
