@@ -63,6 +63,16 @@ jobs:
           - "chapter-09/lambdas/process_link_created"
           - "chapter-09/lambdas/process_link_clicked"
           - "chapter-09/shared"
+          - "chapter-10/examples/lambda-process-sqs"
+          - "chapter-10/examples/otel-simple"
+          - "chapter-10/examples/sqs-receive-traced-message"
+          - "chapter-10/examples/sqs-send-traced-message"
+          - "chapter-10/lambdas/create_link"
+          - "chapter-10/lambdas/get_links"
+          - "chapter-10/lambdas/visit_link"
+          - "chapter-10/lambdas/process_link_created"
+          - "chapter-10/lambdas/process_link_clicked"
+          - "chapter-10/shared"
       fail-fast: false
 
     steps:

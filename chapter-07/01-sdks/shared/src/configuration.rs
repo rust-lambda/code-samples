@@ -35,7 +35,7 @@ impl Default for Configuration {
 impl Configuration {
     pub async fn load(ssm_client: &Client, secret_client: &aws_sdk_secretsmanager::Client) -> Self {
         let mut config = Figment::from(Serialized::defaults(Configuration::default()))
-            // .merge fills in any missing values from the environment
+            // .merge overrides any existing values with new values from the environment
             .merge(Env::prefixed("APP_"));
 
         let ssm_configuration = Configuration::load_from_ssm(ssm_client).await;
@@ -47,7 +47,7 @@ impl Configuration {
         let secret_manager_configuration =
             Configuration::load_from_secret_manager(secret_client).await;
         config = match secret_manager_configuration {
-            Ok(secret_config) => config.join(Json::string(&secret_config)),
+            Ok(secret_config) => config.merge(Json::string(&secret_config)),
             Err(_) => config,
         };
 
