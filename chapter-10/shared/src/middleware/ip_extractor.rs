@@ -1,17 +1,18 @@
 //! Extract the client IP from an incoming Lambda HTTP request.
 //!
-//! This implementation targets **API Gateway** integrations only:
+//! This implementation targets **API Gateway** integrations, plus Lambda
+//! Function URLs, which share the HTTP API payload format:
 //!
-//! * HTTP API (v2) delivers the source IP at
+//! * HTTP API (v2) and Lambda Function URLs deliver the source IP at
 //!   `requestContext.http.sourceIp`.
 //! * REST API (v1) delivers it at `requestContext.identity.sourceIp`.
 //!
 //! Both are populated by AWS from the actual TCP connection, so HTTP
 //! clients cannot forge them.
 //!
-//! Other integrations (Application Load Balancer, AppSync, Lambda
-//! Function URLs, CloudFront-fronted setups, …) deliver the client IP
-//! through different fields or headers and need a different extractor.
+//! Other integrations (Application Load Balancer, AppSync,
+//! CloudFront-fronted setups, …) deliver the client IP through different
+//! fields or headers and need a different extractor.
 
 use std::net::IpAddr;
 use std::str::FromStr;

@@ -201,7 +201,7 @@ where
             let count = match store.increment_and_get(&identifier, bucket).await {
                 Ok(c) => c,
                 Err(e) => {
-                    tracing::error!(ip = %ip, window = bucket, error = %e, "rate_limit: store error");
+                    tracing::error!(window = bucket, error = %e, "rate_limit: store error");
                     // Fail closed: build the default 503, then let the
                     // configurable hook tweak it before sending.
                     let pre_built = build_unavailable_response();
@@ -210,7 +210,7 @@ where
             };
 
             let limit = config.max_requests;
-            tracing::debug!(ip = %ip, window = bucket, count, limit, "rate_limit decision");
+            tracing::debug!(window = bucket, count, limit, "rate_limit decision");
             if count > limit {
                 let ctx = OverLimitCtx {
                     ip,

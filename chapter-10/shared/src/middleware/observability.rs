@@ -100,7 +100,7 @@ where
         Box::pin(async move {
             let result = inner_future.instrument(span.clone()).await;
 
-            match result {
+            let outcome = match result {
                 Ok(inner_response) => {
                     let response = inner_response.into_response().await;
                     let status = response.status();
@@ -112,15 +112,19 @@ where
                         span.record("otel.status_code", OTEL_STATUS_OK);
                     }
 
-                    flusher.flush();
                     Ok(response)
                 }
                 Err(error) => {
                     span.record("otel.status_code", OTEL_STATUS_ERROR);
-                    flusher.flush();
                     Err(error)
                 }
-            }
+            };
+
+            // End the request span before flushing: the exporter only
+            // receives spans that have already ended.
+            drop(span);
+            flusher.flush();
+            outcome
         })
     }
 }
@@ -260,5 +264,75 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
         assert_eq!(flusher.count(), 1);
+    }
+
+    use std::sync::Mutex;
+    use tracing_subscriber::layer::{
+        Context as LayerContext, Layer as SubscriberLayer, SubscriberExt,
+    };
+    use tracing_subscriber::registry::LookupSpan;
+
+    /// Records the name of every span the subscriber closes.
+    struct SpanCloseRecorder {
+        closed: Arc<Mutex<Vec<String>>>,
+    }
+
+    impl<S> SubscriberLayer<S> for SpanCloseRecorder
+    where
+        S: tracing::Subscriber + for<'a> LookupSpan<'a>,
+    {
+        fn on_close(&self, id: tracing::span::Id, ctx: LayerContext<'_, S>) {
+            if let Some(span) = ctx.span(&id) {
+                self.closed.lock().unwrap().push(span.name().to_owned());
+            }
+        }
+    }
+
+    /// Remembers whether the request span had already closed when flush ran.
+    struct SpanStateFlusher {
+        closed: Arc<Mutex<Vec<String>>>,
+        request_span_closed_at_flush: AtomicBool,
+    }
+
+    impl TelemetryFlusher for SpanStateFlusher {
+        fn flush(&self) {
+            let closed = self.closed.lock().unwrap();
+            let is_closed = closed.iter().any(|name| name == "aws.lambda");
+            self.request_span_closed_at_flush
+                .store(is_closed, Ordering::SeqCst);
+        }
+    }
+
+    #[tokio::test]
+    async fn closes_request_span_before_flushing() {
+        let closed = Arc::new(Mutex::new(Vec::new()));
+        let subscriber = tracing_subscriber::registry().with(SpanCloseRecorder {
+            closed: Arc::clone(&closed),
+        });
+        let _guard = tracing::subscriber::set_default(subscriber);
+
+        let flusher = Arc::new(SpanStateFlusher {
+            closed,
+            request_span_closed_at_flush: AtomicBool::new(false),
+        });
+        let layer = HttpObservabilityLayer::with_flusher(flusher.clone());
+
+        let service = ServiceBuilder::new()
+            .layer(layer)
+            .service(service_fn(ok_handler));
+
+        let request = Request::builder()
+            .uri("https://example.com/links")
+            .body(Body::Empty)
+            .unwrap();
+
+        let _ = service.oneshot(request).await.unwrap();
+
+        // The exporter only receives spans that have ended, so the request
+        // span must close before the flush or it is exported one invocation late.
+        assert!(
+            flusher.request_span_closed_at_flush.load(Ordering::SeqCst),
+            "the request span must end before the flush"
+        );
     }
 }
